@@ -1,0 +1,26 @@
+fastapi
+uvicorn[standard]
+
+# for decoding form data
+python-multipart
+
+# for creating and verifying JSON Web Tokens (JWT)
+python-jose[cryptography]
+
+# for hashing passwords
+passlib[bcrypt]
+
+# PostgreSQL database adapter
+psycopg2-binary
+
+# for database interactions
+SQLAlchemy
+
+# for data validation and settings management
+pydantic
+
+pydantic[email]
+
+python-dotenv
+
+bcrypt==3.2.2

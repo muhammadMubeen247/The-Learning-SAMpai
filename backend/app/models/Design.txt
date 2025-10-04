@@ -1,0 +1,32 @@
+# ==========================================================
+# DATABASE SCHEMA DESCRIPTION
+# ==========================================================
+# This schema defines the relationship between Users and Classrooms.
+#
+# 1. Users can CREATE classrooms (they become the "owner").
+#    → One-to-many relationship: one User owns many Classrooms.
+#
+# 2. Users can also JOIN classrooms as members.
+#    → Many-to-many relationship: users ↔ classrooms.
+#    This is managed through the association table `classroom_members`.
+#
+# 3. The `classroom_members` table links users and classrooms.
+#    Each record represents one user's membership in one classroom.
+#    It has a composite primary key (user_id, classroom_id)
+#    to prevent duplicate memberships.
+#
+# 4. Each Classroom has:
+#    - An `owner_id` (foreign key → users.id)
+#    - A unique `code` that can be used by users to join it.
+#    - A list of `members` (users who joined via classroom_members).
+#
+# 5. Each User has:
+#    - `owned_classrooms` → classrooms they created/own.
+#    - `classrooms` → classrooms they joined as members.
+#
+# Example:
+#   Alice (User) owns "Math 101".
+#   Bob (User) joins "Math 101".
+#   → Alice.owned_classrooms = ["Math 101"]
+#   → Bob.classrooms = ["Math 101"]
+# ==========================================================
