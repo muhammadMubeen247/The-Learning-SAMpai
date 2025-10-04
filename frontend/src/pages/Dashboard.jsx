@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import API from "../api/axios";
+import { Link } from "react-router-dom";
 
 export default function Dashboard() {
   const [classrooms, setClassrooms] = useState([]);
@@ -70,21 +71,20 @@ export default function Dashboard() {
       <div className="grid gap-4">
         {classrooms.length === 0 ? (
           <p className="text-gray-600">You are not in any classrooms yet.</p>
-        ) : (
-          classrooms.map((cls) => (
-            <div
-              key={cls.id}
-              className="p-4 border rounded shadow-sm bg-gray-50"
-            >
-              <h4 className="font-bold">{cls.name}</h4>
-              <p>{cls.description}</p>
-              <p className="text-sm text-gray-500">Code: {cls.code}</p>
-              <p className="text-sm text-gray-500">
-                Members: {cls.members.length}
-              </p>
-            </div>
-          ))
-        )}
+) : (
+  classrooms.map((cls) => (
+    <Link key={cls.id} to={`/classroom/${cls.id}`}>
+      <div className="p-4 border rounded shadow-sm bg-gray-50 hover:bg-gray-100 cursor-pointer">
+        <h4 className="font-bold">{cls.name}</h4>
+        <p>{cls.description}</p>
+        <p className="text-sm text-gray-500">Code: {cls.code}</p>
+        <p className="text-sm text-gray-500">
+          Members: {cls.members.length}
+        </p>
+      </div>
+    </Link>
+  ))
+)}
       </div>
 
       {/* Buttons */}

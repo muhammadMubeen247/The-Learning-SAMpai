@@ -3,6 +3,7 @@ import SignupPage from "./pages/SignupPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
+import ClassroomPage from "./pages/ClassroomPage.jsx";
 
 export default function App() {
   return (
@@ -14,6 +15,7 @@ export default function App() {
           path="/dashboard" 
           element={<ProtectedRoute><Dashboard /></ProtectedRoute>} 
         />
+        <Route path="/classroom/:id" element={<ClassroomPage />} />
       </Routes>
     </BrowserRouter>
   );

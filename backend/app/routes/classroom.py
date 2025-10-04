@@ -62,3 +62,18 @@ def get_my_classrooms(
     current_user=Depends(get_current_user)
 ):
     return current_user.classrooms
+
+@router.get("/{id}", response_model=ClassroomOut)
+def get_classroom(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    classroom = db.query(Classroom).filter(Classroom.id == id).first()
+    if not classroom:
+        raise HTTPException(status_code=404, detail="Classroom not found")
+
+    if current_user not in classroom.members:
+        raise HTTPException(status_code=403, detail="You are not a member of this classroom")
+
+    return classroom
