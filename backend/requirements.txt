@@ -24,3 +24,6 @@ pydantic[email]
 python-dotenv
 
 bcrypt==3.2.2
+
+#for cloudfare r2
+boto3

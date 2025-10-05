@@ -1,7 +1,12 @@
+import os
+from dotenv import load_dotenv
 from fastapi import FastAPI
-from app.routes import auth,classroom
+from app.routes import auth,classroom,folder,file
 from app.database.init_db import init_db
 from fastapi.middleware.cors import CORSMiddleware
+
+
+load_dotenv()  # Load environment variables from a .env file if present
 
 app = FastAPI(title="Learning Platform API")
 
@@ -25,6 +30,8 @@ async def startup_event():
 
 app.include_router(auth.router)
 app.include_router(classroom.router)
+app.include_router(folder.router)
+app.include_router(file.router)
 
 @app.get("/")
 def root():

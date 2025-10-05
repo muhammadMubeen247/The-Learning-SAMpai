@@ -18,5 +18,7 @@ class Classroom(Base):
     code = Column(String, unique=True, index=True, nullable=False)  # 👈 join code
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
+
+    folders = relationship("Folder", back_populates="classroom", cascade="all, delete-orphan")
     owner = relationship("User", back_populates="owned_classrooms")
     members = relationship("User", secondary=classroom_members, back_populates="classrooms")
