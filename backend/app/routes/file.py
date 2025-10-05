@@ -34,7 +34,8 @@ def upload_file(folder_id: int, file: UploadFile, db: Session = Depends(get_db))
     db_file = File(
         filename=file.filename,
         file_url=file_url,  # Changed from url to file_url to match model
-        folder_id=folder_id
+        folder_id=folder_id,
+        file_key=key  # Store the R2 object key
     )
     db.add(db_file)
     db.commit()
@@ -43,7 +44,41 @@ def upload_file(folder_id: int, file: UploadFile, db: Session = Depends(get_db))
     return db_file
 
 
-@router.get("/folder/{folder_id}")
+@router.get("/folder/{folder_id}", response_model=list[FileOut])
 def get_files(folder_id: int, db: Session = Depends(get_db)):
+    """Get all files in a folder"""
+    folder = db.query(Folder).filter_by(id=folder_id).first()
+    if not folder:
+        raise HTTPException(status_code=404, detail="Folder not found")
+        
     files = db.query(File).filter_by(folder_id=folder_id).all()
     return files
+
+
+@router.get("/{file_id}", response_model=FileOut)
+def get_file(file_id: int, db: Session = Depends(get_db)):
+    """Get a specific file by ID"""
+    file = db.query(File).filter_by(id=file_id).first()
+    if not file:
+        raise HTTPException(status_code=404, detail="File not found")
+    return file
+
+
+@router.get("/{file_id}/download")
+async def download_file(file_id: int, db: Session = Depends(get_db)):
+    """Get a pre-signed download URL for a specific file"""
+    file = db.query(File).filter_by(id=file_id).first()
+    if not file:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    # Generate presigned URL that expires in 1 hour
+    url = s3.generate_presigned_url(
+        'get_object',
+        Params={
+            'Bucket': os.getenv("R2_BUCKET_NAME"),
+            'Key': file.file_key  # using stored key
+        },
+        ExpiresIn=3600
+    )
+    
+    return {"download_url": url}
