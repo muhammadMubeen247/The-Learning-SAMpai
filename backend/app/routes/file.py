@@ -4,7 +4,9 @@ from app.lib.r2 import s3
 from app.database.session import get_db
 from app.models.file import File
 from app.models.folder import Folder
+from app.models.classroom import Classroom
 from app.schemas.file import FileOut
+from app.dependencies.auth import get_current_user
 from dotenv import load_dotenv
 import os
 
@@ -13,11 +15,30 @@ router = APIRouter(prefix="/files", tags=["Files"])
 load_dotenv()
 
 @router.post("/upload/{folder_id}", response_model=FileOut)
-def upload_file(folder_id: int, file: UploadFile, db: Session = Depends(get_db)):
+def upload_file(
+    folder_id: int, 
+    file: UploadFile, 
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    # Get the folder
     folder = db.query(Folder).filter_by(id=folder_id).first()
     if not folder:
         raise HTTPException(status_code=404, detail="Folder not found")
 
+    # Get the classroom associated with this folder
+    classroom = db.query(Classroom).filter_by(id=folder.classroom_id).first()
+    if not classroom:
+        raise HTTPException(status_code=404, detail="Classroom not found")
+
+    # Check if current user is the classroom owner
+    if classroom.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Only classroom owner can upload files"
+        )
+
+    # Continue with file upload if user is authorized
     bucket = os.getenv("R2_BUCKET_NAME")
     if not bucket:
         raise HTTPException(status_code=500, detail="R2_BUCKET_NAME not configured")
@@ -30,12 +51,11 @@ def upload_file(folder_id: int, file: UploadFile, db: Session = Depends(get_db))
     # Generate file URL using the correct endpoint
     file_url = f"{os.getenv('R2_ENDPOINT')}/{bucket}/{key}"
 
-    # Create file record using correct field name (file_url instead of url)
+    # Create file record
     db_file = File(
         filename=file.filename,
-        file_url=file_url,  # Changed from url to file_url to match model
-        folder_id=folder_id,
-        file_key=key  # Store the R2 object key
+        file_url=file_url,
+        folder_id=folder_id
     )
     db.add(db_file)
     db.commit()
