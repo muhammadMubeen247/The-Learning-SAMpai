@@ -27,3 +27,6 @@ bcrypt==3.2.2
 
 #for cloudfare r2
 boto3
+
+#for database migrations
+alembic==1.13.1

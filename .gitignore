@@ -25,6 +25,7 @@ var/
 .venv
 venv/
 ENV/
+env.py
 
 # Node
 node_modules/
