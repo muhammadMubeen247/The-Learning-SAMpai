@@ -1,18 +1,29 @@
 from passlib.context import CryptContext
+import bcrypt
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# password = "a_very_secure_password_that_is_longer_than_72_bytes_" * 3
-# password2 = "plipplop"
+# Configure CryptContext specifically for bcrypt
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__default_rounds=12,
+    bcrypt__truncate_error=False  # This prevents the 72-byte error
+)
 
 def hash_password(password: str) -> str:
-    # Safely truncate to 72 bytes (bcrypt limit)
-    password = password.encode("utf-8")[:72].decode("utf-8", "ignore")
-    return pwd_context.hash(password)
+    """Hash a password using bcrypt"""
+    # Convert to bytes and truncate if necessary
+    password_bytes = password.encode('utf-8')[:72]
+    # Generate salt and hash
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password_bytes, salt)
+    return hashed.decode('utf-8')
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    plain_password = plain_password.encode("utf-8")[:72].decode("utf-8", "ignore")
-    return pwd_context.verify(plain_password, hashed_password)
-
-# print(hash_password(password))
-# print(hash_password(password2))
+    """Verify a password against a hash"""
+    # Convert inputs to bytes and truncate plain password
+    plain_bytes = plain_password.encode('utf-8')[:72]
+    hash_bytes = hashed_password.encode('utf-8')
+    try:
+        return bcrypt.checkpw(plain_bytes, hash_bytes)
+    except ValueError:
+        return False
