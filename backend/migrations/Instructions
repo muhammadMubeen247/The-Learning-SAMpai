@@ -1,3 +1,0 @@
-Modify your model files
-Generate a new migration: alembic revision --autogenerate -m "Description of changes"
-Apply the migration: alembic upgrade head
