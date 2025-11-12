@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Table
+from sqlalchemy import Column, Integer, String, ForeignKey, Table, DateTime
 from sqlalchemy.orm import relationship
 from app.database.base import Base
+from datetime import datetime
 
 # Association table for many-to-many relation
 classroom_members = Table(
@@ -17,6 +18,7 @@ class Classroom(Base):
     description = Column(String, nullable=True)
     code = Column(String, unique=True, index=True, nullable=False)  # 👈 join code
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
     folders = relationship("Folder", back_populates="classroom", cascade="all, delete-orphan")
