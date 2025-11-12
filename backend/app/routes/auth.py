@@ -49,7 +49,7 @@ def login(payload: UserLogin, db: Session = Depends(get_db)):
             detail="Invalid email or password"
         )
     
-    access_token = create_access_token(data={"sub": user.email})
+    access_token = create_access_token(data={"sub": str(user.id)})
     return {
         "access_token": access_token,
         "token_type": "bearer",

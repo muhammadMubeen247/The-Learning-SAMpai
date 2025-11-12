@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, Depends, HTTPException
+from fastapi import APIRouter, UploadFile, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.lib.r2 import s3
 from app.database.session import get_db
@@ -14,54 +14,63 @@ router = APIRouter(prefix="/files", tags=["Files"])
 
 load_dotenv()
 
-@router.post("/upload/{folder_id}", response_model=FileOut)
-def upload_file(
-    folder_id: int, 
-    file: UploadFile, 
+@router.post("/upload/{folder_id}", response_model=FileOut, status_code=status.HTTP_201_CREATED)
+async def upload_file(
+    folder_id: int,
+    file: UploadFile,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user)
 ):
-    # Get the folder
-    folder = db.query(Folder).filter_by(id=folder_id).first()
+    # Verify folder exists and user has access
+    folder = db.query(Folder).filter(Folder.id == folder_id).first()
     if not folder:
         raise HTTPException(status_code=404, detail="Folder not found")
+    
+    classroom = db.query(Classroom).filter(Classroom.id == folder.classroom_id).first()
+    if current_user not in classroom.members:
+        raise HTTPException(status_code=403, detail="You are not a member of this classroom")
 
-    # Get the classroom associated with this folder
-    classroom = db.query(Classroom).filter_by(id=folder.classroom_id).first()
-    if not classroom:
-        raise HTTPException(status_code=404, detail="Classroom not found")
-
-    # Check if current user is the classroom owner
-    if classroom.owner_id != current_user.id:
+    # Validate file type
+    allowed_extensions = [".pdf", ".docx", ".pptx"]
+    file_extension = os.path.splitext(file.filename)[1].lower()
+    if file_extension not in allowed_extensions:
         raise HTTPException(
-            status_code=403,
-            detail="Only classroom owner can upload files"
+            status_code=400,
+            detail=f"File type not allowed. Supported types: {', '.join(allowed_extensions)}"
         )
 
-    # Continue with file upload if user is authorized
-    bucket = os.getenv("R2_BUCKET_NAME")
-    if not bucket:
-        raise HTTPException(status_code=500, detail="R2_BUCKET_NAME not configured")
-
-    key = f"folders/{folder_id}/{file.filename}"
-
+    # Read file content
+    content = await file.read()
+    
+    # Generate S3 key
+    file_key = f"folders/{folder_id}/{file.filename}"
+    
     # Upload to R2
-    s3.upload_fileobj(file.file, bucket, key)
+    try:
+        s3.put_object(
+            Bucket=os.getenv("R2_BUCKET_NAME"),
+            Key=file_key,
+            Body=content,
+            ContentType=file.content_type
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to upload file: {str(e)}")
 
-    # Generate file URL using the correct endpoint
-    file_url = f"{os.getenv('R2_ENDPOINT')}/{bucket}/{key}"
+    # Generate file URL
+    file_url = f"https://{os.getenv('R2_BUCKET_NAME')}.{os.getenv('R2_ACCOUNT_ID')}.r2.cloudflarestorage.com/{file_key}"
 
-    # Create file record
-    db_file = File(
+    # Save to database
+    new_file = File(
         filename=file.filename,
         file_url=file_url,
+        file_key=file_key, 
         folder_id=folder_id
     )
-    db.add(db_file)
+    db.add(new_file)
     db.commit()
-    db.refresh(db_file)
+    db.refresh(new_file)
 
-    return db_file
+    return new_file
 
 
 @router.get("/folder/{folder_id}", response_model=list[FileOut])
