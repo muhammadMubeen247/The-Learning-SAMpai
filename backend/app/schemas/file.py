@@ -20,7 +20,14 @@ class FileOut(FileBase):
     folder_id: int
     uploaded_at: datetime
     processed_at: Optional[datetime]
-    topics: List[TopicOut] = []  # Include topics in response
+
+    class Config:
+        from_attributes = True
+
+
+class FileWithTopics(FileOut):
+    """File with embedded topics"""
+    topics: List[TopicOut] = []
 
     class Config:
         from_attributes = True

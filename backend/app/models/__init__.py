@@ -1,7 +1,17 @@
-from app.database.base import Base
-from .user import User
-from .classroom import Classroom
-from .folder import Folder
-from .file import File
+from app.models.user import User
+from app.models.classroom import Classroom
+from app.models.folder import Folder
+from app.models.file import File, ProcessingStatus
+from app.models.topic import Topic
+from app.models.chat_message import ChatMessage, MessageRole
 
-__all__ = ["Base", "User", "Classroom", "Folder", "File"]
+__all__ = [
+    "User",
+    "Classroom", 
+    "Folder",
+    "File",
+    "ProcessingStatus",
+    "Topic",
+    "ChatMessage",
+    "MessageRole"
+]
