@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 from fastapi import FastAPI
-from app.routes import auth,classroom,folder,file
+from app.routes import auth,classroom,folder,file, chat
 from app.database.init_db import init_db
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -32,7 +32,16 @@ app.include_router(auth.router)
 app.include_router(classroom.router)
 app.include_router(folder.router)
 app.include_router(file.router)
+app.include_router(chat.router)
 
 @app.get("/")
 def root():
-    return {"msg": "Hello from FastAPI"}
+    return {
+        "message": "Learning SAMpai API v2.0",
+        "features": [
+            "Document upload and processing",
+            "Topic extraction",
+            "RAG-based Q&A",
+            "Persistent chat history"
+        ]
+    }
