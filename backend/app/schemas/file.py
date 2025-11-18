@@ -1,17 +1,26 @@
 from pydantic import BaseModel
-from typing import Optional
+from datetime import datetime
+from typing import Optional, List
+from app.schemas.topic import TopicOut
 
-class FileCreate(BaseModel):
+class FileBase(BaseModel):
     filename: str
-    file_url: str
-    file_key: str  # Added field for R2 object key
     description: Optional[str] = None
 
-class FileOut(BaseModel):
+class FileCreate(FileBase):
+    folder_id: int
+
+class FileOut(FileBase):
     id: int
-    filename: str
     file_url: str
-    description: Optional[str]
+    file_key: str
+    file_type: Optional[str]
+    file_size: Optional[int]
+    processing_status: str
+    folder_id: int
+    uploaded_at: datetime
+    processed_at: Optional[datetime]
+    topics: List[TopicOut] = []  # Include topics in response
 
     class Config:
-        orm_mode = True
+        from_attributes = True
