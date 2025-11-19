@@ -25,6 +25,7 @@ var/
 .venv
 venv/
 ENV/
+env.py
 
 # Node
 node_modules/
@@ -40,4 +41,8 @@ node_modules/
 
 # Database
 *.sqlite3
+*.db
+
+# ChromaDB data
+chroma_data/
 *.db
