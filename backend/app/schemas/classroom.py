@@ -21,4 +21,4 @@ class ClassroomOut(BaseModel):
     members: List[UserOut] = []
 
     class Config:
-        orm_mode = True
+        from_attributes = True
