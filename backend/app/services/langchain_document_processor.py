@@ -166,23 +166,37 @@ class LangChainDocumentProcessor:
         try:
             temp_path = self._save_temp_file(file_content, filename)
             
-            loader = UnstructuredPowerPointLoader(temp_path)
-            documents = loader.load()
-            
-            # Process slides
-            slides = []
-            for idx, doc in enumerate(documents, 1):
-                slides.append({
-                    "slide_number": idx,
-                    "text": doc.page_content.strip()
-                })
-            
-            import os
-            os.unlink(temp_path)
-            
-            logger.info(f"[LangChain] Extracted {len(slides)} slides from PPTX")
-            return slides
-            
+            # Try LangChain loader
+            try:
+                from langchain_community.document_loaders import UnstructuredPowerPointLoader
+                
+                loader = UnstructuredPowerPointLoader(temp_path)
+                documents = loader.load()
+                
+                # Process slides
+                slides = []
+                for idx, doc in enumerate(documents, 1):
+                    slides.append({
+                        "slide_number": idx,
+                        "text": doc.page_content.strip()
+                    })
+                
+                import os
+                os.unlink(temp_path)
+                
+                logger.info(f"[LangChain] Extracted {len(slides)} slides from PPTX")
+                return slides
+                
+            except ImportError as import_error:
+                logger.warning(f"LangChain PPTX loader not available: {import_error}")
+                logger.info("Falling back to python-pptx extraction")
+                
+                # Fallback to old method
+                import os
+                os.unlink(temp_path)
+                from app.services.document_processor import document_processor
+                return document_processor.extract_text_from_pptx(file_content)
+                
         except Exception as e:
             logger.error(f"LangChain PPTX extraction failed: {e}")
             from app.services.document_processor import document_processor

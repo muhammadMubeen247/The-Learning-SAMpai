@@ -28,3 +28,7 @@ unstructured==0.11.0
 # Additional dependencies for unstructured
 pillow==10.2.0
 pdf2image==1.17.0
+
+# NEW: LangChain Phase 2 - Chroma Integration
+langchain-chroma==0.1.4
+unstructured[all-docs]
