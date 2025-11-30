@@ -3,9 +3,10 @@ fastapi==0.109.0
 uvicorn==0.27.0
 starlette==0.35.1
 
-# Database - UPDATED for Python 3.13 compatibility
-sqlalchemy==2.0.25
+# Database
+sqlalchemy==2.0.36
 psycopg==3.2.13
+alembic==1.13.1
 psycopg-binary==3.2.13
 
 # Authentication
@@ -30,30 +31,29 @@ python-pptx==0.6.23
 pillow==12.0.0
 lxml==6.0.2
 xlsxwriter==3.2.9
-unstructured==0.15.13  # ADDED: For PPTX support
 
-# Vector Database - UPGRADED
-chromadb==0.5.23
-chroma-hnswlib==0.7.6
+# Vector Database
+chromadb==0.4.24
+chroma-hnswlib==0.7.3
 
 # OpenAI & Embeddings
 openai==1.109.1
 tiktoken==0.12.0
 
-# LangChain - UPGRADED
-langchain==0.3.14
-langchain-core==0.3.28
-langchain-openai==0.2.14
-langchain-community==0.3.14
-langchain-chroma==0.1.4
-langchain-text-splitters==0.3.4
-langsmith==0.2.7
+# LangChain
+langchain==0.1.20
+langchain-core==0.1.52
+langchain-openai==0.1.7
+langchain-community==0.0.38
+langchain-chroma==0.1.2
+langchain-text-splitters==0.0.2
+langsmith==0.1.147
 
 # Data processing
 numpy==1.26.4
 pydantic==2.12.5
 pydantic-core==2.41.5
-email-validator
+email-validator==2.3.0
 
 # HTTP & Async
 aiohttp==3.13.2
