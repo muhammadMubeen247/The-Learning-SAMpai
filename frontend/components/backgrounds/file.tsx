@@ -171,7 +171,7 @@ const File: React.FC<FileProps> = ({ color = "#3B82F6", size = 1, items = [], cl
         {/* --- The Folded Triangle Corner --- */}
         <div
           className={`absolute z-50 top-0 right-0 w-[25%] h-[20%] transition-all duration-300 ease-in-out
-             ${open ? "-translate-x-[20%] translate-y-[5%] rotate-[-5deg] opacity-90" : "group-hover:rotate-[-2deg]"}
+             ${open ? "-translate-x-[20%] translate-y-[5%] rotate-[-5deg] opacity-0" : "group-hover:opacity-0 group-hover:rotate-[-2deg]"}
              `}
           style={{
             background: fileFoldColor,

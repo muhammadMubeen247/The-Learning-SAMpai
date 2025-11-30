@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
-import { Check, X } from "lucide-react"
+import { Check, X, Eye, EyeOff } from "lucide-react"
 import { PixelCorruptionOverlay, type PixelTransitionHandle } from "@/components/backgrounds/pixel-transition"
 import { useRouter, usePathname } from "next/navigation"
 import API from "@/api/axios" // 👈 Import your axios instance
@@ -18,7 +18,7 @@ interface AuthCardProps {
   initialMode?: Mode
 }
 
-type RuleKey = "length" | "upper" | "lower" | "special" | "match"
+type RuleKey = "length" | "upper" | "lower" | "number" | "special" | "match"
 
 export function AuthCard({ initialMode = "signup" }: AuthCardProps) {
   const [mode, setMode] = useState<Mode>(initialMode)
@@ -39,12 +39,18 @@ export function AuthCard({ initialMode = "signup" }: AuthCardProps) {
   const [loginEmail, setLoginEmail] = useState("")
   const [loginPassword, setLoginPassword] = useState("")
 
+  // Password visibility toggles
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [showLoginPassword, setShowLoginPassword] = useState(false)
+
   // Password validation
   const passwordRules = useMemo(() => {
     const rules: Record<RuleKey, boolean> = {
       length: password.length >= 8,
       upper: /[A-Z]/.test(password),
       lower: /[a-z]/.test(password),
+      number: /[0-9]/.test(password),
       special: /[^A-Za-z0-9]/.test(password),
       match: confirm.length > 0 && password === confirm,
     }
@@ -56,13 +62,14 @@ export function AuthCard({ initialMode = "signup" }: AuthCardProps) {
       (passwordRules.length ? 1 : 0) +
       (passwordRules.upper ? 1 : 0) +
       (passwordRules.lower ? 1 : 0) +
+      (passwordRules.number ? 1 : 0) +
       (passwordRules.special ? 1 : 0)
     )
   }, [passwordRules])
 
-  const progressPct = (satisfiedCount / 4) * 100
+  const progressPct = (satisfiedCount / 5) * 100
   const canSignUp =
-    satisfiedCount === 4 && passwordRules.match && username.trim().length > 0 && /\S+@\S+\.\S+/.test(email)
+    satisfiedCount === 5 && passwordRules.match && username.trim().length > 0 && /\S+@\S+\.\S+/.test(email)
   const canLogin = /\S+@\S+\.\S+/.test(loginEmail) && loginPassword.length >= 1
 
   const triggerSwipe = useCallback(
@@ -193,25 +200,47 @@ export function AuthCard({ initialMode = "signup" }: AuthCardProps) {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="password">Password</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      required
-                    />
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        required
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="confirm">Confirm password</Label>
-                    <Input
-                      id="confirm"
-                      type="password"
-                      value={confirm}
-                      onChange={(e) => setConfirm(e.target.value)}
-                      placeholder="••••••••"
-                      required
-                    />
+                    <div className="relative">
+                      <Input
+                        id="confirm"
+                        type={showConfirmPassword ? "text" : "password"}
+                        value={confirm}
+                        onChange={(e) => setConfirm(e.target.value)}
+                        placeholder="••••••••"
+                        required
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                        aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                      >
+                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </div>
 
                   {/* Password strength meter */}
@@ -221,19 +250,20 @@ export function AuthCard({ initialMode = "signup" }: AuthCardProps) {
                         className={cn(
                           "h-full rounded-full transition-all",
                           satisfiedCount <= 1 && "bg-destructive/70",
-                          satisfiedCount === 2 && "bg-chart-2/70",
-                          satisfiedCount === 3 && "bg-chart-2",
-                          satisfiedCount === 4 && "bg-chart-1",
+                          satisfiedCount === 2 && "bg-destructive/50",
+                          satisfiedCount === 3 && "bg-chart-2/70",
+                          satisfiedCount === 4 && "bg-chart-2",
+                          satisfiedCount === 5 && "bg-chart-1",
                         )}
                         style={{ width: `${progressPct}%` }}
                       />
                     </div>
                     <ul className="grid grid-cols-2 gap-2 text-xs">
-                      <RuleItem ok={passwordRules.length} label="8+ characters" />
+                      <RuleItem ok={passwordRules.length} label="8+ characters" className="col-span-2" />
                       <RuleItem ok={passwordRules.upper} label="One uppercase" />
                       <RuleItem ok={passwordRules.lower} label="One lowercase" />
+                      <RuleItem ok={passwordRules.number} label="One number" />
                       <RuleItem ok={passwordRules.special} label="One special character" />
-                      <RuleItem ok={passwordRules.match} label="Passwords match" className="col-span-2" />
                     </ul>
                   </div>
 
@@ -282,14 +312,25 @@ export function AuthCard({ initialMode = "signup" }: AuthCardProps) {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="lpassword">Password</Label>
-                    <Input
-                      id="lpassword"
-                      type="password"
-                      value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
-                      placeholder="••••••••"
-                      required
-                    />
+                    <div className="relative">
+                      <Input
+                        id="lpassword"
+                        type={showLoginPassword ? "text" : "password"}
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        placeholder="••••••••"
+                        required
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowLoginPassword(!showLoginPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                        aria-label={showLoginPassword ? "Hide password" : "Show password"}
+                      >
+                        {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </div>
 
                   {message && <p className="text-sm text-center text-muted-foreground">{message}</p>}
