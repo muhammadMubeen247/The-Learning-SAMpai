@@ -113,7 +113,7 @@ const AnimatedList = ({
   }, [selectedIndex, keyboardNav])
 
   return (
-    <div className={`relative w-full ${className}`}>
+    <div className={`relative w-full h-full flex flex-col ${className}`}>
       <div
   ref={listRef}
   className={`flex-1 overflow-y-auto p-3 min-h-0 ${

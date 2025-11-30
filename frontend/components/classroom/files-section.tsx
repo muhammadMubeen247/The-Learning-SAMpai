@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Upload, X, Loader2, Check } from "lucide-react"
+import { useRouter } from "next/navigation"
 import File from "@/components/backgrounds/file"
 import Orb from "@/components/backgrounds/orb"
 import API from "@/api/axios"
@@ -31,6 +32,7 @@ type FilesSectionProps = {
 
 export default function FilesSection({ folderId, isOwner, onFileUploaded }: FilesSectionProps) {
   const { theme } = useTheme()
+  const router = useRouter()
   const [files, setFiles] = useState<FileType[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -403,8 +405,16 @@ export default function FilesSection({ folderId, isOwner, onFileUploaded }: File
               return (
                 <div
                   key={file.id}
-                  className="group flex flex-col items-center transition-opacity duration-300"
+                  className="group flex flex-col items-center transition-opacity duration-300 cursor-pointer"
                   style={{ opacity }}
+                  onClick={() => {
+                    // Get classroom ID from current URL
+                    const pathParts = window.location.pathname.split("/")
+                    const classroomId = pathParts[2]
+                    if (classroomId) {
+                      router.push(`/classroom/${classroomId}/folder/${folderId}/file/${file.id}`)
+                    }
+                  }}
                 >
                   <div className="relative flex items-center justify-center w-full h-[150px] mb-2 overflow-visible">
                     <div className="absolute inset-0 blur-2xl bg-gradient-to-br from-chart-1/30 to-chart-2/30 rounded-full pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity" />

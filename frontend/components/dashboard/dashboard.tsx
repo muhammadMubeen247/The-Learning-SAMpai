@@ -91,7 +91,10 @@ export default function Dashboard() {
       router.push("/login")
       return
     }
-    void fetchClassrooms()
+    // Fetch classrooms immediately when user is loaded
+    if (classrooms.length === 0 && !loadingClassrooms) {
+      void fetchClassrooms()
+    }
   }, [hasLoadedUser, user, router])
 
   const { createdClassrooms, joinedClassrooms } = useMemo(() => {
@@ -149,10 +152,12 @@ export default function Dashboard() {
     setIsSubmitting(true)
     setError(null)
     try {
-      await API.post(`/classrooms/join/${code}`)
+      const response = await API.post<Classroom>(`/classrooms/join/${code}`)
+      const classroomId = response.data.id
       setJoinCode("")
       setShowJoin(false)
-      await fetchClassrooms()
+      // Immediately redirect to the classroom page
+      router.push(`/classroom/${classroomId}`)
     } catch (err: any) {
       if (err?.response?.status === 401) {
         if (typeof window !== "undefined") {
@@ -304,14 +309,14 @@ export default function Dashboard() {
         </section>
 
         {/* Right Pane */}
-        <AnimatePresence initial={false} mode="wait">
+        <AnimatePresence mode="wait">
           {hasCreated && (
             <motion.div
               key="right-pane"
-              initial={{ opacity: 0, x: 24 }}
+              initial={{ opacity: 0, x: 8 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 24 }}
-              transition={{ type: "spring", stiffness: 240, damping: 26 }}
+              exit={{ opacity: 0, x: 8 }}
+              transition={{ duration: 0.15, ease: "easeOut" }}
               className="shrink-0 h-full"
             >
               <RightPane
