@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Upload, X, Loader2 } from "lucide-react"
+import { Upload, X, Loader2, Check } from "lucide-react"
 import File from "@/components/backgrounds/file"
 import Orb from "@/components/backgrounds/orb"
 import API from "@/api/axios"
@@ -43,6 +43,9 @@ export default function FilesSection({ folderId, isOwner, onFileUploaded }: File
   const [uploadingFileName, setUploadingFileName] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  // Track processing status and completion tick visibility per file
+  const [fileProcessingStatus, setFileProcessingStatus] = useState<Map<number, "pending" | "processing" | "completed" | "failed">>(new Map())
+  const [fileShowTick, setFileShowTick] = useState<Map<number, boolean>>(new Map())
 
   const fileColor = theme === "dark" ? "#93C5FD" : "#38BDF8"
 
@@ -52,6 +55,73 @@ export default function FilesSection({ folderId, isOwner, onFileUploaded }: File
     try {
       const res = await API.get<FileType[]>(`/files/folder/${folderId}`)
       setFiles(res.data)
+      
+      // Track processing status for all files
+      const statusMap = new Map<number, "pending" | "processing" | "completed" | "failed">()
+      res.data.forEach((file) => {
+        statusMap.set(file.id, file.processing_status as "pending" | "processing" | "completed" | "failed")
+      })
+      setFileProcessingStatus(statusMap)
+      
+      // Start polling for any files that are still processing (only if not already polling for a new upload)
+      const processingFiles = res.data.filter(
+        (file) => file.processing_status === "pending" || file.processing_status === "processing"
+      )
+      if (processingFiles.length > 0 && !uploadedFileId) {
+        // Poll for all processing files
+        const pollAll = async () => {
+          const stillProcessing: number[] = []
+          for (const file of processingFiles) {
+            try {
+              const statusRes = await API.get(`/files/${file.id}/status`)
+              const status = statusRes.data.status
+              setFileProcessingStatus((prev) => new Map(prev).set(file.id, status))
+              
+              if (status === "completed") {
+                setFiles((prev) =>
+                  prev.map((f) =>
+                    f.id === file.id
+                      ? { ...f, processing_status: "completed", processed_at: statusRes.data.processed_at }
+                      : f
+                  )
+                )
+                // Show tick
+                setFileShowTick((prev) => new Map(prev).set(file.id, true))
+                setTimeout(() => {
+                  setFileShowTick((prev) => {
+                    const newMap = new Map(prev)
+                    newMap.delete(file.id)
+                    return newMap
+                  })
+                }, 3000)
+              } else if (status === "failed") {
+                setFiles((prev) =>
+                  prev.map((f) => (f.id === file.id ? { ...f, processing_status: "failed" } : f))
+                )
+              } else {
+                stillProcessing.push(file.id)
+              }
+            } catch (err) {
+              console.error(`Error polling file ${file.id}:`, err)
+              stillProcessing.push(file.id)
+            }
+          }
+          
+          // Stop polling if no files are still processing
+          if (stillProcessing.length === 0 && pollingIntervalRef.current && !uploadedFileId) {
+            clearInterval(pollingIntervalRef.current)
+            pollingIntervalRef.current = null
+          }
+        }
+        
+        // Clear any existing interval first
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current)
+        }
+        
+        // Poll every 2 seconds
+        pollingIntervalRef.current = setInterval(pollAll, 2000)
+      }
     } catch (err: any) {
       if (err?.response?.status === 401) {
         if (typeof window !== "undefined") {
@@ -69,6 +139,14 @@ export default function FilesSection({ folderId, isOwner, onFileUploaded }: File
 
   useEffect(() => {
     void fetchFiles()
+    
+    // Cleanup polling on unmount
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
+      }
+    }
   }, [folderId])
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -141,6 +219,24 @@ export default function FilesSection({ folderId, isOwner, onFileUploaded }: File
       setProcessingProgress(20)
       setIsUploading(false)
 
+      // Add file to list immediately with low opacity
+      const newFile: FileType = {
+        ...response.data,
+        processing_status: "pending",
+      }
+      setFiles((prev) => [...prev, newFile])
+      setFileProcessingStatus((prev) => new Map(prev).set(response.data.id, "pending"))
+
+      // Close upload modal after a short delay
+      setTimeout(() => {
+        setShowLoadingModal(false)
+        setUploadProgress(0)
+        setUploadingFileName("")
+        if (fileInputRef.current) {
+          fileInputRef.current.value = ""
+        }
+      }, 500)
+
       // Start polling for processing status
       // The useEffect will handle the polling
     } catch (err: any) {
@@ -174,6 +270,9 @@ export default function FilesSection({ folderId, isOwner, onFileUploaded }: File
         const res = await API.get(`/files/${fileId}/status`)
         const status = res.data.status
         setProcessingStatus(status)
+        
+        // Update file processing status
+        setFileProcessingStatus((prev) => new Map(prev).set(fileId, status))
 
         // Update progress based on status
         if (status === "pending") {
@@ -182,27 +281,37 @@ export default function FilesSection({ folderId, isOwner, onFileUploaded }: File
           setProcessingProgress(60)
         } else if (status === "completed") {
           setProcessingProgress(100)
-          // Stop polling and refresh files
+          // Stop polling
           if (pollingIntervalRef.current) {
             clearInterval(pollingIntervalRef.current)
             pollingIntervalRef.current = null
           }
-          // Refresh files list
-          const filesRes = await API.get<FileType[]>(`/files/folder/${folderId}`)
-          setFiles(filesRes.data)
-          onFileUploaded?.()
-          // Close modal after a short delay
+          
+          // Update file in list with full opacity
+          setFiles((prev) =>
+            prev.map((file) =>
+              file.id === fileId
+                ? { ...file, processing_status: "completed", processed_at: res.data.processed_at }
+                : file
+            )
+          )
+          
+          // Show green tick
+          setFileShowTick((prev) => new Map(prev).set(fileId, true))
+          
+          // Hide tick after 3 seconds
           setTimeout(() => {
-            setShowLoadingModal(false)
-            setUploadProgress(0)
-            setProcessingProgress(0)
-            setUploadedFileId(null)
-            setProcessingStatus("pending")
-            setUploadingFileName("")
-            if (fileInputRef.current) {
-              fileInputRef.current.value = ""
-            }
-          }, 1500)
+            setFileShowTick((prev) => {
+              const newMap = new Map(prev)
+              newMap.delete(fileId)
+              return newMap
+            })
+          }, 3000)
+          
+          // Reset upload state
+          setUploadedFileId(null)
+          setProcessingStatus("pending")
+          onFileUploaded?.()
         } else if (status === "failed") {
           setProcessingProgress(0)
           setError("File processing failed. Please try again.")
@@ -210,6 +319,12 @@ export default function FilesSection({ folderId, isOwner, onFileUploaded }: File
             clearInterval(pollingIntervalRef.current)
             pollingIntervalRef.current = null
           }
+          // Update file status
+          setFiles((prev) =>
+            prev.map((file) =>
+              file.id === fileId ? { ...file, processing_status: "failed" } : file
+            )
+          )
         }
       } catch (err: any) {
         console.error("Error polling processing status:", err)
@@ -279,19 +394,45 @@ export default function FilesSection({ folderId, isOwner, onFileUploaded }: File
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 sm:gap-x-8 md:gap-x-10 gap-y-20 sm:gap-y-24">
             {/* Files */}
-            {files.map((file) => (
-              <div key={file.id} className="group flex flex-col items-center">
-                <div className="relative flex items-center justify-center w-full h-[150px] mb-2 overflow-visible">
-                  <div className="absolute inset-0 blur-2xl bg-gradient-to-br from-chart-1/30 to-chart-2/30 rounded-full pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <div className="relative z-10 flex items-center justify-center">
-                    <File color={fileColor} size={1.4} className="cursor-pointer transition-transform" />
+            {files.map((file) => {
+              const fileStatus = fileProcessingStatus.get(file.id) || file.processing_status
+              const isProcessing = fileStatus === "pending" || fileStatus === "processing"
+              const showTick = fileShowTick.get(file.id) || false
+              const opacity = isProcessing ? 0.4 : 1
+
+              return (
+                <div
+                  key={file.id}
+                  className="group flex flex-col items-center transition-opacity duration-300"
+                  style={{ opacity }}
+                >
+                  <div className="relative flex items-center justify-center w-full h-[150px] mb-2 overflow-visible">
+                    <div className="absolute inset-0 blur-2xl bg-gradient-to-br from-chart-1/30 to-chart-2/30 rounded-full pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="relative z-10 flex items-center justify-center">
+                      <File color={fileColor} size={1.4} className="cursor-pointer transition-transform" />
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <p className="text-sm text-foreground text-center font-semibold tracking-wide leading-tight px-2 line-clamp-2 min-h-[2.5rem] flex items-center justify-center mt-1">
+                      {file.filename}
+                    </p>
+                    {/* Tiny loading/tick indicator */}
+                    {isProcessing && (
+                      <div className="flex items-center justify-center h-3">
+                        <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                      </div>
+                    )}
+                    {showTick && (
+                      <div className="flex items-center justify-center h-3">
+                        <div className="h-3 w-3 rounded-full bg-green-500 flex items-center justify-center">
+                          <Check className="h-2 w-2 text-white" />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-                <p className="text-sm text-foreground text-center font-semibold tracking-wide leading-tight px-2 line-clamp-2 min-h-[2.5rem] flex items-center justify-center mt-1">
-                  {file.filename}
-                </p>
-              </div>
-            ))}
+              )
+            })}
 
             {/* Upload Button (Owner Only) - Positioned after files in grid */}
             {showUploadButton && (
@@ -350,19 +491,12 @@ export default function FilesSection({ folderId, isOwner, onFileUploaded }: File
                 <div className="relative p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-medium text-foreground">Uploading File</h3>
-                    {processingStatus === "completed" && (
+                    {uploadProgress >= 100 && (
                       <button
                         type="button"
                         onClick={() => {
-                          if (pollingIntervalRef.current) {
-                            clearInterval(pollingIntervalRef.current)
-                            pollingIntervalRef.current = null
-                          }
                           setShowLoadingModal(false)
                           setUploadProgress(0)
-                          setProcessingProgress(0)
-                          setUploadedFileId(null)
-                          setProcessingStatus("pending")
                           setUploadingFileName("")
                         }}
                         className="p-2 rounded-md border border-border/60 bg-card/60 hover:bg-card/80 cursor-pointer"
@@ -388,30 +522,16 @@ export default function FilesSection({ folderId, isOwner, onFileUploaded }: File
                       {uploadProgress < 100 && (
                         <LiquidProgress progress={uploadProgress} label="Uploading file..." />
                       )}
-                      {uploadProgress >= 100 && processingProgress < 100 && (
-                        <div className="space-y-2">
-                          <LiquidProgress progress={processingProgress} label="Processing file..." />
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Loader2 className="size-3 animate-spin" />
-                            <span>
-                              {processingStatus === "pending" && "Preparing..."}
-                              {processingStatus === "processing" &&
-                                "Extracting text and generating embeddings..."}
-                              {processingStatus === "completed" && "Complete!"}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                      {uploadProgress >= 100 && processingProgress >= 100 && (
+                      {uploadProgress >= 100 && (
                         <div className="flex items-center gap-2 text-sm text-green-500">
-                          <span>✓ File uploaded and processed successfully!</span>
+                          <span>✓ File uploaded successfully!</span>
                         </div>
                       )}
                     </div>
 
                     {error && <p className="text-sm text-destructive/90">{error}</p>}
 
-                    {processingStatus !== "completed" && uploadProgress < 100 && (
+                    {uploadProgress < 100 && (
                       <div className="flex items-center justify-end gap-3 pt-2">
                         <button
                           type="button"
