@@ -1,34 +1,68 @@
-# Existing dependencies
+# Core FastAPI
 fastapi==0.109.0
 uvicorn==0.27.0
+starlette==0.35.1
+
+# Database - UPDATED for Python 3.13 compatibility
 sqlalchemy==2.0.25
-psycopg2-binary==2.9.9
+psycopg==3.2.13
+psycopg-binary==3.2.13
+
+# Authentication
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+bcrypt==5.0.0
+cryptography==46.0.3
+
+# File handling & Config
 python-multipart==0.0.6
 python-dotenv==1.0.0
-boto3==1.34.34
 
-# Document processing (keep existing for fallback)
+# AWS S3
+boto3==1.34.34
+botocore==1.34.162
+s3transfer==0.10.4
+
+# Document processing
 PyPDF2==3.0.1
 python-docx==1.1.0
 python-pptx==0.6.23
+pillow==12.0.0
+lxml==6.0.2
+xlsxwriter==3.2.9
+unstructured==0.15.13  # ADDED: For PPTX support
 
-# Embeddings & Vectors (keep existing)
-chromadb==0.4.24
-openai==1.12.0
-tiktoken==0.6.0
+# Vector Database - UPGRADED
+chromadb==0.5.23
+chroma-hnswlib==0.7.6
 
-# NEW: LangChain Phase 1
-langchain==0.1.0
-langchain-openai==0.0.5
-langchain-community==0.0.20
-unstructured==0.11.0
+# OpenAI & Embeddings
+openai==1.109.1
+tiktoken==0.12.0
 
-# Additional dependencies for unstructured
-pillow==10.2.0
-pdf2image==1.17.0
-
-# NEW: LangChain Phase 2 - Chroma Integration
+# LangChain - UPGRADED
+langchain==0.3.14
+langchain-core==0.3.28
+langchain-openai==0.2.14
+langchain-community==0.3.14
 langchain-chroma==0.1.4
-unstructured[all-docs]
+langchain-text-splitters==0.3.4
+langsmith==0.2.7
+
+# Data processing
+numpy==1.26.4
+pydantic==2.12.5
+pydantic-core==2.41.5
+email-validator
+
+# HTTP & Async
+aiohttp==3.13.2
+httpx==0.28.1
+requests==2.32.5
+anyio==4.12.0
+
+# Utilities
+tenacity==8.5.0
+PyYAML==6.0.3
+tqdm==4.67.1
+typing-extensions==4.15.0
