@@ -2,13 +2,17 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
-import { Home, ChevronDown } from "lucide-react"
+import { Home, ChevronDown, Folder } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import AnimatedList from "@/components/backgrounds/animated-list"
 import DotGrid from "@/components/backgrounds/dot-grid"
 import API from "@/api/axios"
 import { useCurrentUser, type CurrentUser } from "@/hooks/use-current-user"
 import { cn } from "@/lib/utils"
+import { useTheme } from "@/hooks/use-theme"
+import dynamic from "next/dynamic"
+
+const Squares = dynamic(() => import("@/components/backgrounds/squares"), { ssr: false })
 
 type Classroom = {
   id: number
@@ -18,22 +22,69 @@ type Classroom = {
   owner_id: number
 }
 
+type FileType = {
+  id: number
+  filename: string
+  file_url: string
+  file_key: string
+  file_type: string | null
+  file_size: number | null
+  processing_status: string
+  folder_id: number
+  uploaded_at: string
+  processed_at: string | null
+}
+
+type Topic = {
+  id: number
+  topic_name: string
+  introduction: string | null
+  order: number
+  file_id: number
+}
+
 type ClassroomSidebarProps = {
   collapsed: boolean
   currentClassroomId: number
   onHomeClick: () => void
+  // File view mode props
+  mode?: "classroom" | "file" | "topic"
+  folderId?: number
+  files?: FileType[]
+  topics?: Topic[]
+  onFolderClick?: () => void
+  onFileSelect?: (fileId: number) => void
+  onTopicSelect?: (topicId: number) => void
+  currentFileId?: number
+  currentTopicId?: number
 }
 
 export default function ClassroomSidebar({
   collapsed,
   currentClassroomId,
   onHomeClick,
+  mode = "classroom",
+  folderId,
+  files = [],
+  topics = [],
+  onFolderClick,
+  onFileSelect,
+  onTopicSelect,
+  currentFileId,
+  currentTopicId,
 }: ClassroomSidebarProps) {
   const router = useRouter()
   const { user } = useCurrentUser()
+  const { theme } = useTheme()
   const [classrooms, setClassrooms] = useState<Classroom[]>([])
   const [loading, setLoading] = useState(true)
   const [joinedExpanded, setJoinedExpanded] = useState(true)
+  const [filesExpanded, setFilesExpanded] = useState(true)
+  const [topicsExpanded, setTopicsExpanded] = useState(true)
+
+  // Theme-appropriate colors for Squares background
+  const borderColor = theme === "dark" ? "rgba(147, 197, 253, 0.3)" : "rgba(56, 189, 248, 0.4)"
+  const hoverFillColor = theme === "dark" ? "rgba(147, 197, 253, 0.1)" : "rgba(56, 189, 248, 0.15)"
 
   const fetchClassrooms = async () => {
     setLoading(true)
@@ -54,9 +105,13 @@ export default function ClassroomSidebar({
   }
 
   useEffect(() => {
-    void fetchClassrooms()
+    if (mode === "classroom") {
+      void fetchClassrooms()
+    } else {
+      setLoading(false)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [mode])
 
   const joinedClassrooms = useMemo(() => {
     if (!user) return []
@@ -83,103 +138,250 @@ export default function ClassroomSidebar({
       className="fixed left-0 top-16 w-[280px] h-[calc(100vh-4rem)] shrink-0 border-r bg-card/70 backdrop-blur-md border-border overflow-hidden flex flex-col z-40"
       style={{ pointerEvents: collapsed ? "none" : "auto" }}
     >
-      {/* Ambient Glow */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(60%_40%_at_40%_10%,color-mix(in_oklab,var(--chart-2),transparent_85%)_0%,transparent_60%)]"
-      />
 
-      {/* DotGrid */}
-      <div className="absolute inset-0 -z-0 opacity-35 pointer-events-none">
-        <DotGrid
-          className="absolute inset-0 p-0 pointer-events-none"
-          dotSize={10}
-          gap={18}
-          baseColor="#334155"
-          activeColor="#64748b"
-          proximity={120}
-          shockRadius={220}
-          shockStrength={4}
-          resistance={700}
-          returnDuration={1.4}
-        />
-      </div>
+      {/* Background - Squares for topic mode, DotGrid for classroom/file mode */}
+      {mode === "topic" ? (
+        <div className="absolute inset-0 -z-0 opacity-60 pointer-events-none">
+          <Squares
+            speed={0.5}
+            squareSize={40}
+            direction="diagonal"
+            borderColor={borderColor}
+            hoverFillColor={hoverFillColor}
+          />
+        </div>
+      ) : (
+        <div className="absolute inset-0 -z-0 opacity-35 pointer-events-none">
+          <DotGrid
+            className="absolute inset-0 p-0 pointer-events-none"
+            style={{ width: "100%", height: "100%" }}
+            dotSize={10}
+            gap={18}
+            baseColor="#334155"
+            activeColor="#64748b"
+            proximity={120}
+            shockRadius={220}
+            shockStrength={4}
+            resistance={700}
+            returnDuration={1.4}
+          />
+        </div>
+      )}
 
-      {/* Home Button */}
+      {/* Home/Folder Button */}
       <div className="relative z-10 px-4 py-4 border-b border-border">
         <button
           type="button"
-          onClick={onHomeClick}
+          onClick={(mode === "file" || mode === "topic") && onFolderClick ? onFolderClick : onHomeClick}
           className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-card/50 cursor-pointer transition-colors w-full"
         >
-          <Home className="size-4 text-foreground" />
-          <span className="text-sm font-medium text-foreground">Home</span>
-        </button>
-      </div>
-
-      {/* Joined Section */}
-      <div className="relative z-10 flex-1 min-h-0 flex flex-col">
-        <button
-          type="button"
-          onClick={() => setJoinedExpanded(!joinedExpanded)}
-          className="flex items-center justify-between px-4 py-3 border-b border-border hover:bg-card/30 cursor-pointer transition-colors"
-        >
-          <div className="flex items-center gap-2">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="size-4 text-foreground"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              aria-hidden
-            >
-              <path d="M16 11a4 4 0 1 0-8 0 4 4 0 0 0 8 0Z"></path>
-              <path
-                fillRule="evenodd"
-                d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 18a7.963 7.963 0 0 1-5.657-2.343A8 8 0 1 1 12 20Z"
-                clipRule="evenodd"
-              ></path>
-            </svg>
-            <span className="text-sm font-medium text-foreground">joined</span>
-          </div>
-          <ChevronDown
-            className={cn(
-              "size-4 text-foreground transition-transform",
-              joinedExpanded && "rotate-180"
-            )}
-            aria-hidden
-          />
-        </button>
-
-        <AnimatePresence>
-          {joinedExpanded && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="flex-1 min-h-0 overflow-hidden"
-            >
-              {loading ? (
-                <div className="p-4 text-sm text-muted-foreground">Loading...</div>
-              ) : joinedNames.length === 0 ? (
-                <div className="p-4 text-sm text-muted-foreground text-center">
-                  No classrooms joined yet
-                </div>
-              ) : (
-                <div className="h-full px-2 py-3 overflow-hidden">
-                  <AnimatedList
-                    items={joinedNames}
-                    onItemSelect={handleClassroomSelect}
-                    className="w-full h-full overflow-y-auto"
-                    itemClassName="border border-border rounded-lg cursor-pointer"
-                    displayScrollbar
-                  />
-                </div>
-              )}
-            </motion.div>
+          {mode === "file" || mode === "topic" ? (
+            <Folder className="size-4 text-foreground" />
+          ) : (
+            <Home className="size-4 text-foreground" />
           )}
-        </AnimatePresence>
+          <span className="text-sm font-medium text-foreground">
+            {mode === "file" || mode === "topic" ? "Folder" : "Home"}
+          </span>
+        </button>
       </div>
+
+      {mode === "topic" ? (
+        <>
+          {/* Topics Section - Topic Mode */}
+          <div className="relative z-10 flex-1 min-h-0 flex flex-col">
+            <button
+              type="button"
+              onClick={() => setTopicsExpanded(!topicsExpanded)}
+              className="flex items-center justify-between px-4 py-3 border-b border-border hover:bg-card/30 cursor-pointer transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="size-4 text-foreground"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  aria-hidden
+                >
+                  <path d="M19 6h-6l-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-7 8H8v-2h4v2Zm3-4H8V8h7v2Z" />
+                </svg>
+                <span className="text-sm font-medium text-foreground">topics</span>
+              </div>
+              <ChevronDown
+                className={cn(
+                  "size-4 text-foreground transition-transform",
+                  topicsExpanded && "rotate-180"
+                )}
+                aria-hidden
+              />
+            </button>
+
+            <AnimatePresence>
+              {topicsExpanded && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex-1 min-h-0 flex flex-col"
+                >
+                  {topics.length === 0 ? (
+                    <div className="p-4 text-sm text-muted-foreground text-center">
+                      No topics available
+                    </div>
+                  ) : (
+                    <div className="flex-1 min-h-0">
+                      <AnimatedList
+                        items={topics.map((t) => t.topic_name)}
+                        onItemSelect={(name, index) => {
+                          const selectedTopic = topics[index]
+                          if (selectedTopic && onTopicSelect) {
+                            onTopicSelect(selectedTopic.id)
+                          }
+                        }}
+                        className="h-full"
+                        itemClassName="border rounded-lg cursor-pointer"
+                        displayScrollbar
+                        initialSelectedIndex={topics.findIndex((t) => t.id === currentTopicId)}
+                      />
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </>
+      ) : mode === "file" ? (
+        <>
+          {/* Files Section */}
+          <div className="relative z-10 flex-1 min-h-0 flex flex-col">
+            <button
+              type="button"
+              onClick={() => setFilesExpanded(!filesExpanded)}
+              className="flex items-center justify-between px-4 py-3 border-b border-border hover:bg-card/30 cursor-pointer transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="size-4 text-foreground"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  aria-hidden
+                >
+                  <path d="M19 6h-6l-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-7 8H8v-2h4v2Zm3-4H8V8h7v2Z" />
+                </svg>
+                <span className="text-sm font-medium text-foreground">files</span>
+              </div>
+              <ChevronDown
+                className={cn(
+                  "size-4 text-foreground transition-transform",
+                  filesExpanded && "rotate-180"
+                )}
+                aria-hidden
+              />
+            </button>
+
+            <AnimatePresence>
+              {filesExpanded && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex-1 min-h-0 flex flex-col"
+                >
+                  {files.length === 0 ? (
+                    <div className="p-4 text-sm text-muted-foreground text-center">
+                      No files in this folder
+                    </div>
+                  ) : (
+                    <div className="flex-1 min-h-0">
+                      <AnimatedList
+                        items={files.map((f) => f.filename)}
+                        onItemSelect={(name, index) => {
+                          const selectedFile = files[index]
+                          if (selectedFile && onFileSelect) {
+                            onFileSelect(selectedFile.id)
+                          }
+                        }}
+                        className="h-full"
+                        itemClassName="border border-border rounded-lg cursor-pointer"
+                        displayScrollbar
+                        initialSelectedIndex={files.findIndex((f) => f.id === currentFileId)}
+                      />
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+        </>
+      ) : (
+        /* Joined Section - Classroom Mode */
+        <div className="relative z-10 flex-1 min-h-0 flex flex-col">
+          <button
+            type="button"
+            onClick={() => setJoinedExpanded(!joinedExpanded)}
+            className="flex items-center justify-between px-4 py-3 border-b border-border hover:bg-card/30 cursor-pointer transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="size-4 text-foreground"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden
+              >
+                <path d="M16 11a4 4 0 1 0-8 0 4 4 0 0 0 8 0Z"></path>
+                <path
+                  fillRule="evenodd"
+                  d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 18a7.963 7.963 0 0 1-5.657-2.343A8 8 0 1 1 12 20Z"
+                  clipRule="evenodd"
+                ></path>
+              </svg>
+              <span className="text-sm font-medium text-foreground">joined</span>
+            </div>
+            <ChevronDown
+              className={cn(
+                "size-4 text-foreground transition-transform",
+                joinedExpanded && "rotate-180"
+              )}
+              aria-hidden
+            />
+          </button>
+
+          <AnimatePresence>
+            {joinedExpanded && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="flex-1 min-h-0 overflow-hidden"
+              >
+                {loading ? (
+                  <div className="p-4 text-sm text-muted-foreground">Loading...</div>
+                ) : joinedNames.length === 0 ? (
+                  <div className="p-4 text-sm text-muted-foreground text-center">
+                    No classrooms joined yet
+                  </div>
+                ) : (
+                  <div className="h-full px-2 py-3 overflow-hidden">
+                    <AnimatedList
+                      items={joinedNames}
+                      onItemSelect={handleClassroomSelect}
+                      className="w-full h-full overflow-y-auto"
+                      itemClassName="border border-border rounded-lg cursor-pointer"
+                      displayScrollbar
+                    />
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
     </motion.aside>
   )
 }

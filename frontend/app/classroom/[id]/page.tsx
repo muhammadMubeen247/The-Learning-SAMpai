@@ -169,8 +169,16 @@ export default function ClassroomPage() {
           </div>
 
           {/* Announcements Section with Plasma Background */}
-          <div className="relative border-t border-border">
-            <div className="absolute inset-0 opacity-80 pointer-events-none z-0">
+          <div className="relative border-t border-border overflow-hidden">
+            <div 
+              className="absolute bottom-0 left-0 right-0 opacity-80 pointer-events-none z-0"
+              style={{ 
+                height: '50vh',
+                maxHeight: '50vh',
+                width: '100%',
+                top: 'auto'
+              }}
+            >
               <Plasma
                 key={`plasma-${pathname}`}
                 color={plasmaColor}

@@ -29,7 +29,7 @@ class LangChainRAGService:
     def __init__(
         self,
         model: str = "gpt-3.5-turbo",
-        temperature: float = 0.7,
+        temperature: float = 0.2,
         max_tokens: int = 500
     ):
         """
@@ -276,6 +276,6 @@ Standalone Question (with full context):"""
 # Singleton instance
 langchain_rag_service = LangChainRAGService(
     model="gpt-3.5-turbo",
-    temperature=0.7,
+    temperature=0.2,
     max_tokens=500
 )
