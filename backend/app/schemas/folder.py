@@ -8,7 +8,7 @@ class FileOut(BaseModel):
     description: Optional[str]
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class FolderCreate(BaseModel):
     name: str
