@@ -25,7 +25,7 @@ class RAGService:
     
     def __init__(
         self,
-        model: str = "gpt-3.5-turbo",
+        model: str = "gpt-5-mini-2025-08-07",
         temperature: float = 0.7,
         max_tokens: int = 500
     ):
@@ -195,7 +195,7 @@ Guidelines:
 
 # Singleton instance
 rag_service = RAGService(
-    model="gpt-3.5-turbo",
+    model="gpt-5-mini-2025-08-07",
     temperature=0.7,
     max_tokens=500
 )
@@ -235,7 +235,7 @@ rag_service = RAGService(
     
 #     def __init__(
 #         self,
-#         model: str = "gpt-3.5-turbo",
+#         model: str = "gpt-5-mini-2025-08-07",
 #         temperature: float = 0.7,
 #         max_tokens: int = 500
 #     ):
@@ -423,7 +423,7 @@ rag_service = RAGService(
 
 # # Singleton instance
 # rag_service = RAGService(
-#     model="gpt-3.5-turbo",
+#     model="gpt-5-mini-2025-08-07",
 #     temperature=0.7,
 #     max_tokens=500
 # )

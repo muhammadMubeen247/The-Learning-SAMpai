@@ -4,7 +4,7 @@ Token counting utilities for cost estimation
 
 import tiktoken
 
-def count_tokens(text: str, model: str = "gpt-3.5-turbo") -> int:
+def count_tokens(text: str, model: str = "gpt-5-mini-2025-08-07") -> int:
     """
     Count tokens in text for a specific model
     
@@ -55,13 +55,13 @@ def estimate_embedding_cost(
 def estimate_chat_cost(
     prompt_tokens: int,
     completion_tokens: int,
-    model: str = "gpt-3.5-turbo"
+    model: str = "gpt-5-mini-2025-08-07"
 ) -> float:
     """
     Estimate cost for chat completion
     
     OpenAI Pricing (as of 2024):
-    - gpt-3.5-turbo: $0.0015/1K prompt, $0.002/1K completion
+    - gpt-5-mini-2025-08-07: $0.0015/1K prompt, $0.002/1K completion
     - gpt-4: $0.03/1K prompt, $0.06/1K completion
     
     Args:
@@ -73,7 +73,7 @@ def estimate_chat_cost(
         Estimated cost in USD
     """
     pricing = {
-        "gpt-3.5-turbo": (0.0015, 0.002),
+        "gpt-5-mini-2025-08-07": (0.0015, 0.002),
         "gpt-4": (0.03, 0.06),
         "gpt-4-turbo": (0.01, 0.03)
     }

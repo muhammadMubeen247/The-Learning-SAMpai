@@ -21,7 +21,7 @@ class TopicExtractor:
     
     def __init__(
         self,
-        model: str = "gpt-3.5-turbo",
+        model: str = "gpt-5-mini-2025-08-07",
         max_topics: int = 10
     ):
         """
@@ -103,7 +103,7 @@ JSON response:"""
         # Combine all chunks
         full_text = "\n\n".join([chunk.content for chunk in chunks])
         
-        # Token limit for GPT-3.5-turbo context
+        # Token limit for gpt-5-mini-2025-08-07 context
         max_tokens = 12000  # Leave room for response
         
         # If text is short enough, use it all
@@ -294,6 +294,6 @@ JSON response:"""
 
 # Singleton instance
 topic_extractor = TopicExtractor(
-    model="gpt-3.5-turbo",
+    model="gpt-5-mini-2025-08-07",
     max_topics=10
 )
