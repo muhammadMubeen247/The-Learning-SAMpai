@@ -6,6 +6,7 @@ starlette==0.35.1
 # Database - UPDATED for Python 3.13 compatibility
 sqlalchemy==2.0.25
 psycopg==3.2.13
+alembic==1.13.1
 psycopg-binary==3.2.13
 
 # Authentication
