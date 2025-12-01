@@ -11,6 +11,7 @@ import ClassroomSidebar from "@/components/classroom/sidebar"
 import ClassroomHeader from "@/components/classroom/header"
 import AnimatedList from "@/components/backgrounds/animated-list"
 import { LoadingOverlay } from "@/components/ui/liquid-orb-loader"
+import { Download } from "lucide-react"
 
 const Squares = dynamic(() => import("@/components/backgrounds/squares"), { ssr: false })
 
@@ -72,6 +73,8 @@ export default function FilePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [isDownloading, setIsDownloading] = useState(false)
 
   // Theme-appropriate colors for Squares background
   const borderColor = theme === "dark" ? "rgba(147, 197, 253, 0.3)" : "rgba(56, 189, 248, 0.4)"
@@ -142,6 +145,28 @@ export default function FilePage() {
       } else {
         setError("Failed to load file. Please try again.")
       }
+    }
+  }
+
+  const handleDownload = async () => {
+    if (!fileId || isDownloading) return
+    setActionError(null)
+    setIsDownloading(true)
+    try {
+      const res = await API.get<{ download_url: string }>(`/files/${fileId}/download`)
+      const url = res.data?.download_url
+      if (url) {
+        if (typeof window !== "undefined") {
+          window.open(url, "_blank")
+        }
+      } else {
+        setActionError("Failed to get download link. Please try again.")
+      }
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail
+      setActionError(normalizeErrorDetail(detail, "Failed to download file."))
+    } finally {
+      setIsDownloading(false)
     }
   }
 
@@ -257,6 +282,13 @@ export default function FilePage() {
             sidebarCollapsed ? "ml-0" : "ml-[280px]"
           }`}
         >
+          {/* Optional inline error for actions (download/delete) */}
+          {actionError && (
+            <div className="mx-8 mt-4 mb-2 rounded-md border border-destructive/40 bg-destructive/5 px-4 py-2 text-sm text-destructive">
+              {actionError}
+            </div>
+          )}
+
           {/* Main Content Area with Squares Background */}
           <div className="relative flex-1 overflow-hidden">
             <div className="absolute inset-0 opacity-60 pointer-events-none z-0">
@@ -270,10 +302,19 @@ export default function FilePage() {
             </div>
 
             <div className="relative z-10 h-full overflow-y-auto overflow-x-hidden">
+              {/* File header */}
+              <div className="flex flex-col gap-2 px-8 pt-8">
+                <div className="min-w-0">
+                  <h2 className="truncate text-2xl font-semibold text-foreground">
+                    {file.filename}
+                  </h2>
+                </div>
+              </div>
+
               {/* Main Content - Topics List */}
-              <div className="flex-1 flex flex-col p-8">
+              <div className="flex-1 flex flex-col px-8 pb-8 pt-4">
                 <div className="mb-6">
-                  <h2 className="text-2xl font-semibold text-foreground mb-2">Topics</h2>
+                  <h3 className="text-lg font-semibold text-foreground mb-1">Topics</h3>
                   <p className="text-sm text-muted-foreground">
                     Select a topic to view its details
                   </p>
@@ -307,6 +348,19 @@ export default function FilePage() {
           </div>
         </main>
       </div>
+
+      {/* Floating download button - bottom right, fixed */}
+      <button
+        type="button"
+        onClick={handleDownload}
+        disabled={isDownloading}
+        className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2 rounded-full border border-border/60 bg-primary text-primary-foreground px-5 py-3 shadow-xl shadow-primary/30 hover:bg-primary/90 disabled:opacity-60 cursor-pointer"
+      >
+        <Download className="h-5 w-5" />
+        <span className="text-sm font-medium">
+          {isDownloading ? "Preparing download..." : "Download file"}
+        </span>
+      </button>
     </div>
   )
 }

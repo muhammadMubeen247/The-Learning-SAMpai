@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Upload, X, Loader2, Check } from "lucide-react"
+import { Upload, X, Loader2, Check, Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import File from "@/components/backgrounds/file"
 import Orb from "@/components/backgrounds/orb"
@@ -152,6 +152,36 @@ export default function FilesSection({ folderId, isOwner, onFileUploaded }: File
       setLoadingProgress(100)
       setLoading(false)
       setTimeout(() => setLoadingProgress(0), 500)
+    }
+  }
+
+  const handleDeleteFile = async (fileId: number, filename: string) => {
+    if (!isOwner) return
+
+    if (typeof window !== "undefined") {
+      const confirmed = window.confirm(
+        `Are you sure you want to delete "${filename}"?\nThis will remove the file and its topics permanently.`
+      )
+      if (!confirmed) return
+    }
+
+    try {
+      await API.delete(`/files/${fileId}`)
+      // Remove from local state and status maps
+      setFiles((prev) => prev.filter((f) => f.id !== fileId))
+      setFileProcessingStatus((prev) => {
+        const next = new Map(prev)
+        next.delete(fileId)
+        return next
+      })
+      setFileShowTick((prev) => {
+        const next = new Map(prev)
+        next.delete(fileId)
+        return next
+      })
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail
+      setError(normalizeErrorDetail(detail, "Failed to delete file"))
     }
   }
 
@@ -459,6 +489,20 @@ export default function FilesSection({ folderId, isOwner, onFileUploaded }: File
                           <Check className="h-2 w-2 text-white" />
                         </div>
                       </div>
+                    )}
+                    {/* Delete icon under file name (owners only) */}
+                    {isOwner && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          void handleDeleteFile(file.id, file.filename)
+                        }}
+                        className="mt-1 inline-flex items-center justify-center rounded-full border border-border/80 bg-card/80 px-3 py-1.5 text-sm text-destructive hover:bg-card/95 cursor-pointer"
+                        aria-label={`Delete ${file.filename}`}
+                      >
+                        <Trash2 className="h-4.5 w-4.5" />
+                      </button>
                     )}
                   </div>
                 </div>
