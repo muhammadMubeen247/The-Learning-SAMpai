@@ -44,6 +44,8 @@ export default function FilesSection({ folderId, isOwner, onFileUploaded }: File
   const [processingStatus, setProcessingStatus] = useState<"pending" | "processing" | "completed" | "failed">("pending")
   const [processingProgress, setProcessingProgress] = useState(0)
   const [uploadingFileName, setUploadingFileName] = useState("")
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deletingFileName, setDeletingFileName] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   // Track processing status and completion tick visibility per file
@@ -165,6 +167,10 @@ export default function FilesSection({ folderId, isOwner, onFileUploaded }: File
       if (!confirmed) return
     }
 
+    setError(null)
+    setIsDeleting(true)
+    setDeletingFileName(filename)
+
     try {
       await API.delete(`/files/${fileId}`)
       // Remove from local state and status maps
@@ -182,6 +188,9 @@ export default function FilesSection({ folderId, isOwner, onFileUploaded }: File
     } catch (err: any) {
       const detail = err?.response?.data?.detail
       setError(normalizeErrorDetail(detail, "Failed to delete file"))
+    } finally {
+      setIsDeleting(false)
+      setDeletingFileName("")
     }
   }
 
@@ -541,7 +550,7 @@ export default function FilesSection({ folderId, isOwner, onFileUploaded }: File
         )}
       </div>
 
-      {/* Loading Modal */}
+      {/* Upload Loading Modal */}
       <AnimatePresence>
         {showLoadingModal && (
           <>
@@ -665,6 +674,50 @@ export default function FilesSection({ folderId, isOwner, onFileUploaded }: File
                         </button>
                       </div>
                     )}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Loading Modal */}
+      <AnimatePresence>
+        {isDeleting && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="fixed inset-0 z-30 bg-background/50 backdrop-blur-md"
+              aria-hidden
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              transition={{ type: "spring", stiffness: 260, damping: 22 }}
+              className="fixed inset-0 z-40 grid place-items-center p-4"
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="relative w-full max-w-sm rounded-2xl border border-border bg-card/70 backdrop-blur-xl shadow-2xl">
+                <div className="relative p-6 space-y-4">
+                  <h3 className="text-lg font-medium text-foreground">Deleting file</h3>
+                  {deletingFileName && (
+                    <p className="text-sm text-muted-foreground break-words">
+                      {deletingFileName}
+                    </p>
+                  )}
+                  <div className="flex items-center justify-center py-4">
+                    <LoadingOrb
+                      progress={50}
+                      size="md"
+                      message="Deleting file..."
+                      showProgress={false}
+                    />
                   </div>
                 </div>
               </div>
