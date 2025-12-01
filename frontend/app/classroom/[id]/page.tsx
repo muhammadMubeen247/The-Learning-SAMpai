@@ -12,6 +12,7 @@ import ClassroomHeader from "@/components/classroom/header"
 import FoldersSection from "@/components/classroom/folders-section"
 import AnnouncementsSection from "@/components/classroom/announcements-section"
 import ClassroomCodeDisplay from "@/components/classroom/code-display"
+import { LoadingOverlay } from "@/components/ui/liquid-orb-loader"
 
 const Squares = dynamic(() => import("@/components/backgrounds/squares"), { ssr: false })
 const Plasma = dynamic(() => import("@/components/backgrounds/plasma"), { ssr: false })
@@ -39,15 +40,29 @@ export default function ClassroomPage() {
 
   const [classroom, setClassroom] = useState<Classroom | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadingProgress, setLoadingProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   const fetchClassroom = async () => {
     setLoading(true)
+    setLoadingProgress(0)
     setError(null)
+    
+    // Simulate progress for better UX
+    const progressInterval = setInterval(() => {
+      setLoadingProgress((prev) => {
+        if (prev >= 90) return prev
+        return prev + Math.random() * 15
+      })
+    }, 100)
+    
     try {
+      setLoadingProgress(30)
       const res = await API.get<Classroom>(`/classrooms/${classroomId}`)
+      setLoadingProgress(70)
       setClassroom(res.data)
+      setLoadingProgress(100)
     } catch (err: any) {
       if (err?.response?.status === 401) {
         if (typeof window !== "undefined") {
@@ -64,7 +79,9 @@ export default function ClassroomPage() {
         setError("Failed to load classroom. Please try again.")
       }
     } finally {
+      clearInterval(progressInterval)
       setLoading(false)
+      setTimeout(() => setLoadingProgress(0), 500)
     }
   }
 
@@ -90,7 +107,13 @@ export default function ClassroomPage() {
   if (loading || userLoading) {
     return (
       <div className="min-h-screen w-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Loading classroom...</p>
+        <LoadingOverlay 
+          isLoading={true} 
+          progress={loadingProgress}
+          message="Loading classroom..."
+          size="xl"
+          fullScreen={true}
+        />
       </div>
     )
   }
