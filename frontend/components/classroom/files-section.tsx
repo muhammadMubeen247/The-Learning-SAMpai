@@ -9,7 +9,7 @@ import Orb from "@/components/backgrounds/orb"
 import API from "@/api/axios"
 import { normalizeErrorDetail } from "@/lib/error-utils"
 import { useTheme } from "@/hooks/use-theme"
-import LiquidProgress from "@/components/ui/liquid-progress"
+import { LoadingOrb } from "@/components/ui/liquid-orb-loader"
 
 type FileType = {
   id: number
@@ -35,6 +35,7 @@ export default function FilesSection({ folderId, isOwner, onFileUploaded }: File
   const router = useRouter()
   const [files, setFiles] = useState<FileType[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingProgress, setLoadingProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [showLoadingModal, setShowLoadingModal] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
@@ -53,9 +54,21 @@ export default function FilesSection({ folderId, isOwner, onFileUploaded }: File
 
   const fetchFiles = async () => {
     setLoading(true)
+    setLoadingProgress(0)
     setError(null)
+    
+    // Simulate progress for better UX
+    const progressInterval = setInterval(() => {
+      setLoadingProgress((prev) => {
+        if (prev >= 90) return prev
+        return prev + Math.random() * 15
+      })
+    }, 100)
+    
     try {
+      setLoadingProgress(30)
       const res = await API.get<FileType[]>(`/files/folder/${folderId}`)
+      setLoadingProgress(70)
       setFiles(res.data)
       
       // Track processing status for all files
@@ -135,7 +148,10 @@ export default function FilesSection({ folderId, isOwner, onFileUploaded }: File
         setError("Failed to load files")
       }
     } finally {
+      clearInterval(progressInterval)
+      setLoadingProgress(100)
       setLoading(false)
+      setTimeout(() => setLoadingProgress(0), 500)
     }
   }
 
@@ -361,8 +377,13 @@ export default function FilesSection({ folderId, isOwner, onFileUploaded }: File
     <div className="p-4 sm:p-6 md:p-8 pt-36 sm:pt-40 min-h-full w-full overflow-x-hidden">
       <div className="max-w-[1400px] mx-auto w-full">
         {loading ? (
-          <div className="text-center py-16">
-            <p className="text-muted-foreground">Loading files...</p>
+          <div className="flex items-center justify-center py-16 min-h-[60vh]">
+            <LoadingOrb 
+              progress={loadingProgress}
+              size="lg"
+              message="Loading files..."
+              showProgress={true}
+            />
           </div>
         ) : !hasFiles && !showUploadButton ? (
           <div className="text-center py-16">
@@ -530,11 +551,44 @@ export default function FilesSection({ folderId, isOwner, onFileUploaded }: File
                     {/* Upload Progress */}
                     <div className="space-y-3 pt-2">
                       {uploadProgress < 100 && (
-                        <LiquidProgress progress={uploadProgress} label="Uploading file..." />
+                        <div className="flex flex-col items-center justify-center py-4">
+                          <LoadingOrb 
+                            progress={uploadProgress}
+                            size="md"
+                            message="Uploading file..."
+                            showProgress={true}
+                          />
+                        </div>
                       )}
-                      {uploadProgress >= 100 && (
-                        <div className="flex items-center gap-2 text-sm text-green-500">
-                          <span>✓ File uploaded successfully!</span>
+                      {uploadProgress >= 100 && processingStatus === "pending" && (
+                        <div className="flex flex-col items-center justify-center py-4 space-y-2">
+                          <div className="flex items-center gap-2 text-sm text-green-500">
+                            <span>✓ File uploaded successfully!</span>
+                          </div>
+                          <LoadingOrb 
+                            progress={processingProgress}
+                            size="sm"
+                            message="Processing file..."
+                            showProgress={true}
+                          />
+                        </div>
+                      )}
+                      {uploadProgress >= 100 && processingStatus === "processing" && (
+                        <div className="flex flex-col items-center justify-center py-4 space-y-2">
+                          <div className="flex items-center gap-2 text-sm text-green-500">
+                            <span>✓ File uploaded successfully!</span>
+                          </div>
+                          <LoadingOrb 
+                            progress={processingProgress}
+                            size="sm"
+                            message="Processing file..."
+                            showProgress={true}
+                          />
+                        </div>
+                      )}
+                      {uploadProgress >= 100 && processingStatus === "completed" && (
+                        <div className="flex items-center justify-center gap-2 text-sm text-green-500 py-4">
+                          <span>✓ File uploaded and processed successfully!</span>
                         </div>
                       )}
                     </div>

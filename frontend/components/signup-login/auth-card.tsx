@@ -11,6 +11,7 @@ import { Check, X, Eye, EyeOff } from "lucide-react"
 import { PixelCorruptionOverlay, type PixelTransitionHandle } from "@/components/backgrounds/pixel-transition"
 import { useRouter, usePathname } from "next/navigation"
 import API from "@/api/axios" // 👈 Import your axios instance
+import { LoadingOverlay } from "@/components/ui/liquid-orb-loader"
 
 type Mode = "signup" | "login"
 
@@ -24,6 +25,7 @@ export function AuthCard({ initialMode = "signup" }: AuthCardProps) {
   const [mode, setMode] = useState<Mode>(initialMode)
   const [isSwiping, setIsSwiping] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [loadingProgress, setLoadingProgress] = useState(0)
   const [message, setMessage] = useState<string | null>(null)
   const overlayRef = useRef<PixelTransitionHandle | null>(null)
   const router = useRouter()
@@ -91,19 +93,33 @@ export function AuthCard({ initialMode = "signup" }: AuthCardProps) {
     e.preventDefault()
     if (!canSignUp || loading) return
     setLoading(true)
+    setLoadingProgress(0)
     setMessage(null)
+    
+    // Simulate progress for better UX
+    const progressInterval = setInterval(() => {
+      setLoadingProgress((prev) => {
+        if (prev >= 90) return prev
+        return prev + Math.random() * 10
+      })
+    }, 100)
+    
     try {
+      setLoadingProgress(30)
       const res = await API.post("/auth/signup", {
         username,
         email,
         password,
       })
+      setLoadingProgress(70)
       setMessage("Signup successful! Redirecting to login...")
+      setLoadingProgress(90)
       // Smoothly transition after signup
       await overlayRef.current?.run(() => {
         setMode("login")
         router.push("/login")
       })
+      setLoadingProgress(100)
     } catch (err: any) {
       const detail = err?.response?.data?.detail
       let friendly = "Signup failed. Please try again."
@@ -115,7 +131,9 @@ export function AuthCard({ initialMode = "signup" }: AuthCardProps) {
       }
       setMessage(friendly)
     } finally {
+      clearInterval(progressInterval)
       setLoading(false)
+      setTimeout(() => setLoadingProgress(0), 500)
     }
   }
 
@@ -124,17 +142,31 @@ export function AuthCard({ initialMode = "signup" }: AuthCardProps) {
     e.preventDefault()
     if (!canLogin || loading) return
     setLoading(true)
+    setLoadingProgress(0)
     setMessage(null)
+    
+    // Simulate progress for better UX
+    const progressInterval = setInterval(() => {
+      setLoadingProgress((prev) => {
+        if (prev >= 90) return prev
+        return prev + Math.random() * 10
+      })
+    }, 100)
+    
     try {
+      setLoadingProgress(30)
       const res = await API.post("/auth/login", {
         email: loginEmail,
         password: loginPassword,
       })
+      setLoadingProgress(70)
       localStorage.setItem("token", res.data.access_token)
       if (res.data.user) {
         localStorage.setItem("user", JSON.stringify(res.data.user))
       }
+      setLoadingProgress(90)
       setMessage("Login successful! Redirecting...")
+      setLoadingProgress(100)
       router.push("/dashboard")
     } catch (err: any) {
       const detail = err?.response?.data?.detail
@@ -146,12 +178,21 @@ export function AuthCard({ initialMode = "signup" }: AuthCardProps) {
       }
       setMessage(friendly)
     } finally {
+      clearInterval(progressInterval)
       setLoading(false)
+      setTimeout(() => setLoadingProgress(0), 500)
     }
   }
 
   return (
     <div className="relative w-full flex items-center justify-center overflow-hidden">
+      <LoadingOverlay 
+        isLoading={loading} 
+        progress={loadingProgress}
+        message={mode === "signup" ? "Creating your account..." : "Logging in..."}
+        size="lg"
+        fullScreen={false}
+      />
       <div className="relative w-full max-w-md">
         <div className="relative rounded-2xl border border-primary/20 bg-card/80 backdrop-blur-xl shadow-[0_0_0_1px_inset_var(--color-primary)] ring-1 ring-border/40">
           <div className="absolute -inset-px rounded-2xl pointer-events-none bg-gradient-to-br from-chart-1/20 via-transparent to-chart-2/20" />

@@ -6,10 +6,11 @@ export default function Loading() {
       <LoadingOverlay 
         isLoading={true} 
         progress={0}
-        message="Loading..."
+        message="Loading classrooms..."
         size="xl"
         fullScreen={true}
       />
     </div>
   )
 }
+

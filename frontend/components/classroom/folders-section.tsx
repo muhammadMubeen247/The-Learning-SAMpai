@@ -9,6 +9,7 @@ import Orb from "@/components/backgrounds/orb"
 import API from "@/api/axios"
 import { normalizeErrorDetail } from "@/lib/error-utils"
 import { useTheme } from "@/hooks/use-theme"
+import { LoadingOrb } from "@/components/ui/liquid-orb-loader"
 
 type FolderType = {
   id: number
@@ -31,6 +32,7 @@ export default function FoldersSection({
   const { theme } = useTheme()
   const [folders, setFolders] = useState<FolderType[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingProgress, setLoadingProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [folderName, setFolderName] = useState("")
@@ -40,10 +42,23 @@ export default function FoldersSection({
 
   const fetchFolders = async () => {
     setLoading(true)
+    setLoadingProgress(0)
     setError(null)
+    
+    // Simulate progress for better UX
+    const progressInterval = setInterval(() => {
+      setLoadingProgress((prev) => {
+        if (prev >= 90) return prev
+        return prev + Math.random() * 15
+      })
+    }, 100)
+    
     try {
+      setLoadingProgress(30)
       const res = await API.get<FolderType[]>(`/folders/classroom/${classroomId}`)
+      setLoadingProgress(70)
       setFolders(res.data)
+      setLoadingProgress(100)
     } catch (err: any) {
       if (err?.response?.status === 401) {
         if (typeof window !== "undefined") {
@@ -55,7 +70,9 @@ export default function FoldersSection({
         setError("Failed to load folders")
       }
     } finally {
+      clearInterval(progressInterval)
       setLoading(false)
+      setTimeout(() => setLoadingProgress(0), 500)
     }
   }
 
@@ -101,8 +118,13 @@ export default function FoldersSection({
     <div className="p-4 sm:p-6 md:p-8 pt-20 sm:pt-24 md:pt-28 min-h-full w-full overflow-x-hidden">
       <div className="max-w-[1400px] mx-auto w-full">
         {loading ? (
-          <div className="text-center py-16">
-            <p className="text-muted-foreground">Loading folders...</p>
+          <div className="flex items-center justify-center py-16 min-h-[60vh]">
+            <LoadingOrb 
+              progress={loadingProgress}
+              size="lg"
+              message="Loading folders..."
+              showProgress={true}
+            />
           </div>
         ) : !hasFolders && !showCreateButton ? (
           <div className="text-center py-16">

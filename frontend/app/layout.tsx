@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { Suspense } from "react"
+import { NavigationLoader } from "@/components/ui/navigation-loader"
 import "./globals.css"
 
 const geistSans = Geist({ subsets: ["latin"], variable: "--font-geist-sans" })
@@ -40,6 +41,7 @@ export default function RootLayout({
         />
       </head>
       <body className="font-sans">
+        <NavigationLoader />
         <Suspense fallback={null}>{children}</Suspense>
         <Analytics />
       </body>
