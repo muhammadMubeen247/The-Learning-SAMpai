@@ -65,7 +65,7 @@ export default function FoldersSection({
           localStorage.removeItem("token")
           localStorage.removeItem("user")
         }
-        window.location.href = "/login"
+        router.push("/login")
       } else {
         setError("Failed to load folders")
       }
@@ -99,7 +99,7 @@ export default function FoldersSection({
           localStorage.removeItem("token")
           localStorage.removeItem("user")
         }
-        window.location.href = "/login"
+        router.push("/login")
       } else if (err?.response?.status === 403) {
         setError("Only the owner can create folders")
       } else {

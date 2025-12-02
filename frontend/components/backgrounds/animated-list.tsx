@@ -73,6 +73,18 @@ const AnimatedList = ({
   useEffect(() => {
     if (!enableArrowNavigation) return
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      const tagName = target?.tagName
+      const isTypingElement =
+        tagName === "INPUT" ||
+        tagName === "TEXTAREA" ||
+        target?.isContentEditable
+
+      // Don't hijack keyboard events while the user is typing in an input/textarea/editor
+      if (isTypingElement) {
+        return
+      }
+
       if (e.key === "ArrowDown" || (e.key === "Tab" && !e.shiftKey)) {
         e.preventDefault()
         setKeyboardNav(true)

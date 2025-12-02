@@ -185,6 +185,7 @@ export default function FolderPage() {
             </div>
             <div className="relative z-10 h-full overflow-y-auto overflow-x-hidden">
               <FilesSection
+                classroomId={classroomId}
                 folderId={folderId}
                 isOwner={isOwner ?? false}
                 onFileUploaded={() => {
