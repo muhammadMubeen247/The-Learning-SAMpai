@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
-import { Send } from "lucide-react"
+import { Send, Loader2 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import API from "@/api/axios"
 import { useCurrentUser, type CurrentUser } from "@/hooks/use-current-user"
@@ -11,7 +11,9 @@ import { normalizeErrorDetail } from "@/lib/error-utils"
 import { useTheme } from "@/hooks/use-theme"
 import ClassroomSidebar from "@/components/classroom/sidebar"
 import ClassroomHeader from "@/components/classroom/header"
+import AnimatedList from "@/components/backgrounds/animated-list"
 import { cn } from "@/lib/utils"
+import { LoadingOverlay } from "@/components/ui/liquid-orb-loader"
 
 const Squares = dynamic(() => import("@/components/backgrounds/squares"), { ssr: false })
 const Plasma = dynamic(() => import("@/components/backgrounds/plasma"), { ssr: false })
@@ -282,6 +284,7 @@ export default function TopicChatPage() {
         }
       )
     } catch (err: any) {
+      setIsAsking(false)
       if (err?.response?.status === 401) {
         if (typeof window !== "undefined") {
           localStorage.removeItem("token")
@@ -296,7 +299,7 @@ export default function TopicChatPage() {
       }
     } finally {
       setIsAsking(false)
-    } 
+    }
   }
 
   useEffect(() => {
@@ -324,7 +327,17 @@ export default function TopicChatPage() {
   const topicNames = topics.map((t) => t.topic_name)
 
   if (loading || userLoading) {
-    return null
+    return (
+      <div className="min-h-screen w-screen bg-background flex items-center justify-center">
+        <LoadingOverlay 
+          isLoading={true} 
+          progress={0}
+          message="Loading chat..."
+          size="xl"
+          fullScreen={true}
+        />
+      </div>
+    )
   }
 
   if (error || !classroom || !folder || !file || !topic) {
@@ -497,9 +510,9 @@ export default function TopicChatPage() {
                   >
                     <motion.div
                       initial={{ scale: 0.8 }}
-                      animate={{
+                      animate={{ 
                         scale: 1,
-                        y: [0, -4, 0],
+                        y: [0, -4, 0]
                       }}
                       transition={{
                         scale: {
@@ -510,16 +523,16 @@ export default function TopicChatPage() {
                         y: {
                           duration: 1.5,
                           repeat: Infinity,
-                          ease: "easeInOut",
-                        },
+                          ease: "easeInOut"
+                        }
                       }}
                       className="max-w-2xl rounded-2xl bg-card/80 backdrop-blur-sm border border-border p-6 shadow-lg"
                     >
                       <div className="flex items-center gap-1.5">
                         <motion.span
-                          animate={{
+                          animate={{ 
                             opacity: [0.3, 1, 0.3],
-                            y: [0, -3, 0],
+                            y: [0, -3, 0]
                           }}
                           transition={{
                             opacity: {
@@ -531,14 +544,14 @@ export default function TopicChatPage() {
                               duration: 1.4,
                               repeat: Infinity,
                               ease: "easeInOut",
-                            },
+                            }
                           }}
                           className="w-2 h-2 rounded-full bg-foreground/60"
                         />
                         <motion.span
-                          animate={{
+                          animate={{ 
                             opacity: [0.3, 1, 0.3],
-                            y: [0, -3, 0],
+                            y: [0, -3, 0]
                           }}
                           transition={{
                             opacity: {
@@ -552,14 +565,14 @@ export default function TopicChatPage() {
                               repeat: Infinity,
                               ease: "easeInOut",
                               delay: 0.2,
-                            },
+                            }
                           }}
                           className="w-2 h-2 rounded-full bg-foreground/60"
                         />
                         <motion.span
-                          animate={{
+                          animate={{ 
                             opacity: [0.3, 1, 0.3],
-                            y: [0, -3, 0],
+                            y: [0, -3, 0]
                           }}
                           transition={{
                             opacity: {
@@ -573,7 +586,7 @@ export default function TopicChatPage() {
                               repeat: Infinity,
                               ease: "easeInOut",
                               delay: 0.4,
-                            },
+                            }
                           }}
                           className="w-2 h-2 rounded-full bg-foreground/60"
                         />

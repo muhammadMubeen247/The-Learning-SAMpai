@@ -10,6 +10,7 @@ import { useTheme } from "@/hooks/use-theme"
 import ClassroomSidebar from "@/components/classroom/sidebar"
 import ClassroomHeader from "@/components/classroom/header"
 import AnimatedList from "@/components/backgrounds/animated-list"
+import { LoadingOverlay } from "@/components/ui/liquid-orb-loader"
 import { Download } from "lucide-react"
 
 const Squares = dynamic(() => import("@/components/backgrounds/squares"), { ssr: false })
@@ -206,7 +207,17 @@ export default function FilePage() {
   const topicNames = topics.map((topic) => topic.topic_name)
 
   if (loading || userLoading) {
-    return null
+    return (
+      <div className="min-h-screen w-screen bg-background flex items-center justify-center">
+        <LoadingOverlay 
+          isLoading={true} 
+          progress={0}
+          message="Loading file..."
+          size="xl"
+          fullScreen={true}
+        />
+      </div>
+    )
   }
 
   if (error || !classroom || !folder || !file) {
