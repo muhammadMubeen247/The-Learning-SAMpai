@@ -2,11 +2,13 @@
 
 import type React from "react"
 
+import dynamic from "next/dynamic"
 import { motion, AnimatePresence } from "motion/react"
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { Route, MessageSquare, FlaskConical, FileCheck, Trophy, Users, AlertTriangle, Clock } from "lucide-react"
-import Hyperspeed from "@/components/backgrounds/hyperspeed"
 import { useTheme } from "@/hooks/use-theme"
+
+const Hyperspeed = dynamic(() => import("@/components/backgrounds/hyperspeed"), { ssr: false })
 
 export function FeaturesSection() {
   const { theme } = useTheme()

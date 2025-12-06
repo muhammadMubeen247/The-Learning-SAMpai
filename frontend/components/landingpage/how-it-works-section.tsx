@@ -1,12 +1,14 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { motion } from "motion/react"
 import { useInView } from "motion/react"
 import { useRef, useMemo } from "react"
 import { Database, Brain, Sparkles, TrendingUp } from "lucide-react"
-import Aurora from "@/components/backgrounds/Aurora"
-import MagicBento from "@/components/backgrounds/magic-bento"
 import { useTheme } from "@/hooks/use-theme"
+
+const Aurora = dynamic(() => import("@/components/backgrounds/Aurora"), { ssr: false })
+const MagicBento = dynamic(() => import("@/components/backgrounds/magic-bento"), { ssr: false })
 
 export function HowItWorksSection() {
   const ref = useRef(null)

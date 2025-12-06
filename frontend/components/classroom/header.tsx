@@ -1,7 +1,7 @@
 "use client"
 
+import Link from "next/link"
 import { Menu, ChevronRight } from "lucide-react"
-import { useRouter } from "next/navigation"
 import { ThemeToggle } from "@/components/theme/theme-toggle"
 import {
   DropdownMenu,
@@ -36,8 +36,6 @@ export default function ClassroomHeader({
   folderId,
   fileId,
 }: ClassroomHeaderProps) {
-  const router = useRouter()
-
   return (
     <div className="fixed top-0 left-0 right-0 z-50 h-16 border-b border-border bg-background/80 backdrop-blur-xl">
       <div className="flex items-center justify-between h-full px-4">
@@ -52,61 +50,67 @@ export default function ClassroomHeader({
           </button>
           {topicName ? (
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => classroomId && router.push(`/classroom/${classroomId}`)}
-                className="text-lg font-semibold text-foreground hover:underline transition-all cursor-pointer"
-              >
-                {classroomName}
-              </button>
+              {classroomId && (
+                <Link
+                  href={`/classroom/${classroomId}`}
+                  className="text-lg font-semibold text-foreground hover:underline transition-all cursor-pointer"
+                >
+                  {classroomName}
+                </Link>
+              )}
               <ChevronRight className="size-4 text-muted-foreground" />
-              <button
-                type="button"
-                onClick={() => classroomId && folderId && router.push(`/classroom/${classroomId}/folder/${folderId}`)}
-                className="text-lg font-semibold text-foreground hover:underline transition-all cursor-pointer"
-              >
-                {folderName}
-              </button>
+              {classroomId && folderId && (
+                <Link
+                  href={`/classroom/${classroomId}/folder/${folderId}`}
+                  className="text-lg font-semibold text-foreground hover:underline transition-all cursor-pointer"
+                >
+                  {folderName}
+                </Link>
+              )}
               <ChevronRight className="size-4 text-muted-foreground" />
-              <button
-                type="button"
-                onClick={() => classroomId && folderId && fileId && router.push(`/classroom/${classroomId}/folder/${folderId}/file/${fileId}`)}
-                className="text-lg font-semibold text-foreground hover:underline transition-all cursor-pointer"
-              >
-                {fileName}
-              </button>
+              {classroomId && folderId && fileId && (
+                <Link
+                  href={`/classroom/${classroomId}/folder/${folderId}/file/${fileId}`}
+                  className="text-lg font-semibold text-foreground hover:underline transition-all cursor-pointer"
+                >
+                  {fileName}
+                </Link>
+              )}
               <ChevronRight className="size-4 text-muted-foreground" />
               <span className="text-lg font-semibold text-foreground">{topicName}</span>
             </div>
           ) : fileName ? (
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => classroomId && router.push(`/classroom/${classroomId}`)}
-                className="text-lg font-semibold text-foreground hover:underline transition-all cursor-pointer"
-              >
-                {classroomName}
-              </button>
+              {classroomId && (
+                <Link
+                  href={`/classroom/${classroomId}`}
+                  className="text-lg font-semibold text-foreground hover:underline transition-all cursor-pointer"
+                >
+                  {classroomName}
+                </Link>
+              )}
               <ChevronRight className="size-4 text-muted-foreground" />
-              <button
-                type="button"
-                onClick={() => classroomId && folderId && router.push(`/classroom/${classroomId}/folder/${folderId}`)}
-                className="text-lg font-semibold text-foreground hover:underline transition-all cursor-pointer"
-              >
-                {folderName}
-              </button>
+              {classroomId && folderId && (
+                <Link
+                  href={`/classroom/${classroomId}/folder/${folderId}`}
+                  className="text-lg font-semibold text-foreground hover:underline transition-all cursor-pointer"
+                >
+                  {folderName}
+                </Link>
+              )}
               <ChevronRight className="size-4 text-muted-foreground" />
               <span className="text-lg font-semibold text-foreground">{fileName}</span>
             </div>
           ) : folderName ? (
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => classroomId && router.push(`/classroom/${classroomId}`)}
-                className="text-lg font-semibold text-foreground hover:underline transition-all cursor-pointer"
-              >
-                {classroomName}
-              </button>
+              {classroomId && (
+                <Link
+                  href={`/classroom/${classroomId}`}
+                  className="text-lg font-semibold text-foreground hover:underline transition-all cursor-pointer"
+                >
+                  {classroomName}
+                </Link>
+              )}
               <ChevronRight className="size-4 text-muted-foreground" />
               <span className="text-lg font-semibold text-foreground">{folderName}</span>
             </div>

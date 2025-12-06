@@ -1,15 +1,16 @@
 "use client"
 
+import Link from "next/link"
+import dynamic from "next/dynamic"
 import { Button } from "@/components/ui/button"
 import { motion } from "motion/react"
 import { ArrowRight, Sparkles } from "lucide-react"
-import Threads from "@/components/backgrounds/threads"
 import { useTheme } from "@/hooks/use-theme" // read theme to key heavy visuals
-import { useRouter } from "next/navigation"
+
+const Threads = dynamic(() => import("@/components/backgrounds/threads"), { ssr: false })
 
 export function HeroSection() {
   const { theme } = useTheme() // get theme
-  const router = useRouter()
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
       {/* Animated Background */}
@@ -59,22 +60,24 @@ export function HeroSection() {
             transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
-            <Button
-              size="lg"
-              className="text-base px-8 py-6 cursor-pointer bg-gradient-to-r from-chart-1 to-chart-2 hover:opacity-90 transition-all duration-300 group"
-              onClick={() => router.push("/signup")}
-            >
-              Get Started as a Student
-              <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="text-base px-8 py-6 cursor-pointer border-2 hover:bg-accent transition-all duration-300 bg-transparent"
-              onClick={() => router.push("/signup")}
-            >
-              Explore Teacher Tools
-            </Button>
+            <Link href="/signup">
+              <Button
+                size="lg"
+                className="text-base px-8 py-6 cursor-pointer bg-gradient-to-r from-chart-1 to-chart-2 hover:opacity-90 transition-all duration-300 group"
+              >
+                Get Started as a Student
+                <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+              </Button>
+            </Link>
+            <Link href="/signup">
+              <Button
+                size="lg"
+                variant="outline"
+                className="text-base px-8 py-6 cursor-pointer border-2 hover:bg-accent transition-all duration-300 bg-transparent"
+              >
+                Explore Teacher Tools
+              </Button>
+            </Link>
           </motion.div>
 
           <motion.div
