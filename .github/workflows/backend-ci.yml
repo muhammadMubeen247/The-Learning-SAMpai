@@ -59,6 +59,7 @@ jobs:
           R2_SECRET_ACCESS_KEY: test-secret
           R2_BUCKET_NAME: test-bucket
           R2_ENDPOINT_URL: http://localhost:9000
+          PYTHONPATH: .
         run: pytest app/tests/ -v
 
   lint:
