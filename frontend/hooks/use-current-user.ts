@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useAuthContext } from "@/app/providers"
 import API from "@/api/axios"
 
 export type CurrentUser = {
@@ -10,11 +11,14 @@ export type CurrentUser = {
 }
 
 export function useCurrentUser() {
+  const { isHydrated } = useAuthContext()
   const [user, setUser] = useState<CurrentUser | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const stored = typeof window !== "undefined" ? localStorage.getItem("user") : null
+    if (!isHydrated) return
+
+    const stored = localStorage.getItem("user")
     if (stored) {
       try {
         const parsed = JSON.parse(stored) as CurrentUser
@@ -26,7 +30,7 @@ export function useCurrentUser() {
       }
     }
 
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
+    const token = localStorage.getItem("token")
     if (!token) {
       setLoading(false)
       return
@@ -41,18 +45,18 @@ export function useCurrentUser() {
           email: res.data.email,
         }
         setUser(me)
-        if (typeof window !== "undefined") {
-          localStorage.setItem("user", JSON.stringify(me))
-        }
+        localStorage.setItem("user", JSON.stringify(me))
       } catch {
         // invalid token or other error, treat as logged out
+        localStorage.removeItem("token")
+        localStorage.removeItem("user")
       } finally {
         setLoading(false)
       }
     })()
-  }, [])
+  }, [isHydrated])
 
-  return { user, loading, setUser }
+  return { user, loading: loading || !isHydrated, setUser }
 }
 
 

@@ -1,12 +1,14 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { motion } from "motion/react"
 import { AlertCircle, TrendingDown, Clock } from "lucide-react"
 import { useInView } from "motion/react"
 import { useRef } from "react"
-import PixelBlast from "@/components/backgrounds/pixel-blast"
-import ElectricBorder from "@/components/backgrounds/electric-border"
 import { useTheme } from "@/hooks/use-theme"
+
+const PixelBlast = dynamic(() => import("@/components/backgrounds/pixel-blast"), { ssr: false })
+const ElectricBorder = dynamic(() => import("@/components/backgrounds/electric-border"), { ssr: false })
 
 export function ProblemSection() {
   const ref = useRef(null)

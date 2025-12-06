@@ -1,12 +1,14 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { motion } from "motion/react"
 import { useInView } from "motion/react"
 import { useRef } from "react"
 import { Brain, Zap, Target, TrendingUp } from "lucide-react"
-import LightRays from "@/components/backgrounds/light-rays"
-import OrbEnhanced from "@/components/backgrounds/orb-enhanced"
 import { useTheme } from "@/hooks/use-theme"
+
+const LightRays = dynamic(() => import("@/components/backgrounds/light-rays"), { ssr: false })
+const OrbEnhanced = dynamic(() => import("@/components/backgrounds/orb-enhanced"), { ssr: false })
 
 export function SolutionSection() {
   const ref = useRef(null)

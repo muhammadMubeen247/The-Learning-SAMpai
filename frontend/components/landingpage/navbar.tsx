@@ -1,12 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import ThemeToggle from "@/components/theme/theme-toggle"
 import { Menu, X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useTheme } from "@/hooks/use-theme"
-import { useRouter } from "next/navigation"
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -26,7 +26,6 @@ export function Navbar({ variant = "full", username = "User", onLogout, actions 
   const { theme } = useTheme()
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const router = useRouter()
 
   const scrollTo = (id: string) => {
     if (variant === "minimal") return
@@ -109,19 +108,21 @@ export function Navbar({ variant = "full", username = "User", onLogout, actions 
                 transition={{ delay: 0.4, duration: 0.5 }}
                 className="flex items-center space-x-3"
               >
-                <Button
-                  variant="ghost"
-                  className="text-sm font-medium cursor-pointer"
-                  onClick={() => router.push("/login")}
-                >
-                  Log in
-                </Button>
-                <Button
-                  className="text-sm font-medium cursor-pointer bg-gradient-to-r from-(--chart-1) to-(--chart-2) hover:opacity-90 transition-opacity"
-                  onClick={() => router.push("/signup")}
-                >
-                  Sign up
-                </Button>
+                <Link href="/login">
+                  <Button
+                    variant="ghost"
+                    className="text-sm font-medium cursor-pointer"
+                  >
+                    Log in
+                  </Button>
+                </Link>
+                <Link href="/signup">
+                  <Button
+                    className="text-sm font-medium cursor-pointer bg-gradient-to-r from-(--chart-1) to-(--chart-2) hover:opacity-90 transition-opacity"
+                  >
+                    Sign up
+                  </Button>
+                </Link>
               </motion.div>
             </div>
           ) : (
@@ -251,19 +252,21 @@ export function Navbar({ variant = "full", username = "User", onLogout, actions 
                   How it works
                 </Button>
                 <div className="pt-3 border-t border-border/50 space-y-2">
-                  <Button
-                    variant="ghost"
-                    className="w-full cursor-pointer"
-                    onClick={() => (setIsMobileMenuOpen(false), router.push("/login"))}
-                  >
-                    Log in
-                  </Button>
-                  <Button
-                    className="w-full cursor-pointer bg-gradient-to-r from-(--chart-1) to-(--chart-2)"
-                    onClick={() => (setIsMobileMenuOpen(false), router.push("/signup"))}
-                  >
-                    Sign up
-                  </Button>
+                  <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
+                    <Button
+                      variant="ghost"
+                      className="w-full cursor-pointer"
+                    >
+                      Log in
+                    </Button>
+                  </Link>
+                  <Link href="/signup" onClick={() => setIsMobileMenuOpen(false)}>
+                    <Button
+                      className="w-full cursor-pointer bg-gradient-to-r from-(--chart-1) to-(--chart-2)"
+                    >
+                      Sign up
+                    </Button>
+                  </Link>
                 </div>
               </div>
             </motion.div>

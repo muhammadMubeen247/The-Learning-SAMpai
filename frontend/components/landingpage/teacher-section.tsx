@@ -1,12 +1,14 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { motion } from "framer-motion"
 import { useInView } from "react-intersection-observer"
 import { useRef, useState, useEffect } from "react"
 import { FileEdit, CheckCircle, BarChart3, Lightbulb, Palette, Shield, MessageCircle } from "lucide-react"
-import Stack from "@/components/backgrounds/stack"
-import Plasma from "@/components/backgrounds/plasma"
 import { useTheme } from "@/hooks/use-theme"
+
+const Stack = dynamic(() => import("@/components/backgrounds/stack"), { ssr: false })
+const Plasma = dynamic(() => import("@/components/backgrounds/plasma"), { ssr: false })
 
 export function TeacherSection() {
   const ref = useRef(null)

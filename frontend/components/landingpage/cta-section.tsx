@@ -1,19 +1,20 @@
 "use client"
 
+import Link from "next/link"
+import dynamic from "next/dynamic"
 import { motion } from "framer-motion"
 import { useInView } from "framer-motion"
 import { useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { ArrowRight, Sparkles } from "lucide-react"
-import DotGrid from "@/components/backgrounds/dot-grid"
 import { useTheme } from "@/hooks/use-theme"
-import { useRouter } from "next/navigation"
+
+const DotGrid = dynamic(() => import("@/components/backgrounds/dot-grid"), { ssr: false })
 
 export function CTASection() {
   const ref = useRef(null)
   const isInView = useInView(ref, { once: true, margin: "-100px" })
   const { theme, mounted } = useTheme()
-  const router = useRouter()
   const resolvedTheme = mounted ? theme : "dark"
   const baseColor = resolvedTheme === "dark" ? "#3b82f6" /* blue-500 */ : "#2563eb" /* blue-600 */
   const activeColor = resolvedTheme === "dark" ? "#60a5fa" /* blue-400 */ : "#0ea5e9" /* cyan-500 */
@@ -66,22 +67,24 @@ export function CTASection() {
             transition={{ duration: 0.8, delay: 0.2 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
-            <Button
-              size="lg"
-              className="text-base px-8 py-6 cursor-pointer bg-gradient-to-r from-chart-1 to-chart-2 hover:opacity-90 transition-all duration-300 group"
-              onClick={() => router.push("/signup")}
-            >
-              Start Learning Today
-              <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="text-base px-8 py-6 cursor-pointer border-2 hover:bg-accent transition-all duration-300 bg-transparent"
-              onClick={() => router.push("/signup")}
-            >
-              Schedule a Demo
-            </Button>
+            <Link href="/signup">
+              <Button
+                size="lg"
+                className="text-base px-8 py-6 cursor-pointer bg-gradient-to-r from-chart-1 to-chart-2 hover:opacity-90 transition-all duration-300 group"
+              >
+                Start Learning Today
+                <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+              </Button>
+            </Link>
+            <Link href="/signup">
+              <Button
+                size="lg"
+                variant="outline"
+                className="text-base px-8 py-6 cursor-pointer border-2 hover:bg-accent transition-all duration-300 bg-transparent"
+              >
+                Schedule a Demo
+              </Button>
+            </Link>
           </motion.div>
         </motion.div>
       </div>

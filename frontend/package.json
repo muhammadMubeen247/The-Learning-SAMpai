@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "build": "next build",
+    "build:analyze": "cross-env ANALYZE=true next build",
     "dev": "next dev",
     "lint": "next lint",
     "start": "next start"
@@ -49,10 +50,6 @@
     "cmdk": "latest",
     "date-fns": "latest",
     "embla-carousel-react": "latest",
-    "expo": "latest",
-    "expo-asset": "latest",
-    "expo-file-system": "latest",
-    "expo-gl": "latest",
     "framer-motion": "latest",
     "geist": "latest",
     "gsap": "latest",
@@ -69,7 +66,6 @@
     "react-dom": "19.2.0",
     "react-hook-form": "^7.60.0",
     "react-intersection-observer": "latest",
-    "react-native": "latest",
     "react-resizable-panels": "^2.1.7",
     "recharts": "latest",
     "sonner": "latest",
@@ -80,10 +76,12 @@
     "zod": "latest"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^15.2.4",
     "@tailwindcss/postcss": "^4.1.9",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "cross-env": "^7.0.3",
     "postcss": "^8.5.0",
     "tailwindcss": "^4.1.9",
     "tw-animate-css": "1.3.3",
