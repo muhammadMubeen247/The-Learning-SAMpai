@@ -18,7 +18,7 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
-
+.env.docker
 # Virtual Environment
 .env
 .venv
