@@ -1,0 +1,251 @@
+{
+  "metadata": {
+    "classroom_id": 2,
+    "file_id": 4,
+    "document_name": "Chapter #1 Introduction to Psychology.pdf"
+  },
+  "questions": [
+    {
+      "id": 1,
+      "question": "What is the modern definition of psychology?",
+      "ground_truth": "Psychology is the scientific study of behavior and mental processes.",
+      "relevant_page": 2,
+      "topic_id": 15,
+      "category": "factual"
+    },
+    {
+      "id": 2,
+      "question": "What are the three key terms in the modern definition of psychology?",
+      "ground_truth": "The three key terms are science, behavior, and mental processes.",
+      "relevant_page": 7,
+      "topic_id": 15,
+      "category": "factual"
+    },
+    {
+      "id": 3,
+      "question": "What does behavior mean in psychology?",
+      "ground_truth": "Behavior refers to observable actions such as laughing, running, crying, speaking, and writing.",
+      "relevant_page": 8,
+      "topic_id": 15,
+      "category": "factual"
+    },
+    {
+      "id": 4,
+      "question": "What are mental processes in psychology?",
+      "ground_truth": "Mental processes include thoughts, feelings, and motives that cannot be directly observed.",
+      "relevant_page": 8,
+      "topic_id": 15,
+      "category": "factual"
+    },
+    {
+      "id": 5,
+      "question": "What are the four main goals of psychology?",
+      "ground_truth": "The four main goals of psychology are describe, explain, predict, and control behavior.",
+      "relevant_page": 9,
+      "topic_id": 15,
+      "category": "factual"
+    },
+    {
+      "id": 6,
+      "question": "What does the goal 'Describe' mean in psychology?",
+      "ground_truth": "Describe means collecting data and observing behavior under specific conditions.",
+      "relevant_page": 9,
+      "topic_id": 15,
+      "category": "factual"
+    },
+    {
+      "id": 7,
+      "question": "What does the goal 'Explain' mean in psychology?",
+      "ground_truth": "Explain involves identifying causes, principles, and relationships behind behavior.",
+      "relevant_page": 9,
+      "topic_id": 15,
+      "category": "factual"
+    },
+    {
+      "id": 8,
+      "question": "What does the goal 'Predict' mean in psychology?",
+      "ground_truth": "Predict means forecasting future behavior based on measurements and observations.",
+      "relevant_page": 10,
+      "topic_id": 15,
+      "category": "factual"
+    },
+    {
+      "id": 9,
+      "question": "What does the goal 'Control' mean in psychology?",
+      "ground_truth": "Control means modifying behavior to improve individual and societal outcomes.",
+      "relevant_page": 10,
+      "topic_id": 15,
+      "category": "factual"
+    },
+    {
+      "id": 10,
+      "question": "What is an additional goal of psychology?",
+      "ground_truth": "An additional goal of psychology is to improve the quality of human life.",
+      "relevant_page": 9,
+      "topic_id": 15,
+      "category": "factual"
+    },
+
+    {
+      "id": 11,
+      "question": "What was the earliest definition of psychology?",
+      "ground_truth": "Psychology was first defined as the science of soul.",
+      "relevant_page": 2,
+      "topic_id": 16,
+      "category": "factual"
+    },
+    {
+      "id": 12,
+      "question": "Why was psychology as the science of soul rejected?",
+      "ground_truth": "It was rejected because the soul cannot be observed, measured, or scientifically tested.",
+      "relevant_page": 3,
+      "topic_id": 16,
+      "category": "reasoning"
+    },
+    {
+      "id": 13,
+      "question": "Who wrote the book 'De Anima'?",
+      "ground_truth": "Aristotle wrote the book 'De Anima'.",
+      "relevant_page": 3,
+      "topic_id": 16,
+      "category": "factual"
+    },
+    {
+      "id": 14,
+      "question": "What is psychology as the science of mind?",
+      "ground_truth": "Psychology as the science of mind studies mental processes such as thoughts, feelings, and sensations.",
+      "relevant_page": 3,
+      "topic_id": 16,
+      "category": "factual"
+    },
+    {
+      "id": 15,
+      "question": "What are the three aspects of mental processes?",
+      "ground_truth": "The three aspects are cognition, affect, and conation.",
+      "relevant_page": 4,
+      "topic_id": 16,
+      "category": "factual"
+    },
+    {
+      "id": 16,
+      "question": "Who defined psychology as the science of consciousness?",
+      "ground_truth": "John Dewey and William James defined psychology as the science of consciousness.",
+      "relevant_page": 5,
+      "topic_id": 16,
+      "category": "factual"
+    },
+    {
+      "id": 17,
+      "question": "What is stream of consciousness?",
+      "ground_truth": "Stream of consciousness is the continuous flow of thoughts and experiences.",
+      "relevant_page": 5,
+      "topic_id": 16,
+      "category": "factual"
+    },
+    {
+      "id": 18,
+      "question": "Who defined psychology as the science of behavior?",
+      "ground_truth": "J. B. Watson defined psychology as the science of behavior.",
+      "relevant_page": 6,
+      "topic_id": 16,
+      "category": "factual"
+    },
+    {
+      "id": 19,
+      "question": "What is the stimulus-response theory?",
+      "ground_truth": "Stimulus-response theory explains behavior as a reaction to environmental stimuli.",
+      "relevant_page": 7,
+      "topic_id": 16,
+      "category": "factual"
+    },
+    {
+      "id": 20,
+      "question": "What is the comprehensive modern definition of psychology?",
+      "ground_truth": "Psychology is the systematic and scientific study of behavior and mental processes.",
+      "relevant_page": 7,
+      "topic_id": 16,
+      "category": "factual"
+    },
+
+    {
+      "id": 21,
+      "question": "How does psychology help improve study habits?",
+      "ground_truth": "Psychology helps improve study habits by applying behavioral and cognitive strategies.",
+      "relevant_page": 10,
+      "topic_id": 17,
+      "category": "application"
+    },
+    {
+      "id": 22,
+      "question": "How does psychology help manage stress?",
+      "ground_truth": "Psychology teaches coping strategies to manage stress and anxiety.",
+      "relevant_page": 10,
+      "topic_id": 17,
+      "category": "application"
+    },
+    {
+      "id": 23,
+      "question": "How do psychologists modify behavior?",
+      "ground_truth": "Psychologists modify behavior using prediction and behavioral interventions.",
+      "relevant_page": 10,
+      "topic_id": 17,
+      "category": "application"
+    },
+    {
+      "id": 24,
+      "question": "What is the role of industrial psychologists?",
+      "ground_truth": "Industrial psychologists modify employee behavior to improve productivity.",
+      "relevant_page": 10,
+      "topic_id": 17,
+      "category": "factual"
+    },
+    {
+      "id": 25,
+      "question": "How does psychology help marriage counseling?",
+      "ground_truth": "Marriage counselors modify behavior to improve relationships between partners.",
+      "relevant_page": 10,
+      "topic_id": 17,
+      "category": "application"
+    },
+    {
+      "id": 26,
+      "question": "How does psychology help improve memory?",
+      "ground_truth": "Psychology provides strategies to expand memory span.",
+      "relevant_page": 10,
+      "topic_id": 17,
+      "category": "application"
+    },
+    {
+      "id": 27,
+      "question": "How does psychology help problem solving?",
+      "ground_truth": "Psychology provides methods to effectively solve problems.",
+      "relevant_page": 10,
+      "topic_id": 17,
+      "category": "application"
+    },
+    {
+      "id": 28,
+      "question": "How does psychology help improve self-esteem?",
+      "ground_truth": "Psychology helps enhance self-esteem through behavioral and cognitive techniques.",
+      "relevant_page": 10,
+      "topic_id": 17,
+      "category": "application"
+    },
+    {
+      "id": 29,
+      "question": "How does psychology help control anger?",
+      "ground_truth": "Psychology teaches strategies to control anger and emotional responses.",
+      "relevant_page": 10,
+      "topic_id": 17,
+      "category": "application"
+    },
+    {
+      "id": 30,
+      "question": "How does psychology help control poor study habits?",
+      "ground_truth": "Psychology applies behavioral techniques to change poor study habits.",
+      "relevant_page": 10,
+      "topic_id": 17,
+      "category": "application"
+    }
+  ]
+}
