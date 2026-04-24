@@ -23,5 +23,6 @@ s3 = session.client(
     endpoint_url=r2_endpoint,  # e.g. https://<accountid>.r2.cloudflarestorage.com
     aws_access_key_id=access_key,
     aws_secret_access_key=secret_key,
-    config=Config(signature_version="s3v4") 
+    region_name="auto",  # Cloudflare R2 requires 'auto' (not AWS regions like ap-south-1)
+    config=Config(signature_version="s3v4")
 )

@@ -3,6 +3,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.database.session import get_db
 from app.models.folder import Folder
@@ -33,6 +34,11 @@ async def create_folder(
     db.add(new_folder)
     await db.commit()
     await db.refresh(new_folder)
+    # Re-fetch with files eagerly loaded to avoid lazy-load greenlet error
+    result = await db.execute(
+        select(Folder).where(Folder.id == new_folder.id).options(selectinload(Folder.files))
+    )
+    new_folder = result.scalar_one()
     logger.info(
         f"[folder] CREATE folder_id={new_folder.id} name='{new_folder.name}' "
         f"classroom_id={classroom_id} user_id={current_user.id}"
@@ -51,7 +57,9 @@ async def get_folders(
     if not classroom:
         raise HTTPException(status_code=404, detail="Classroom not found")
 
-    result = await db.execute(select(Folder).where(Folder.classroom_id == classroom_id))
+    result = await db.execute(
+        select(Folder).where(Folder.classroom_id == classroom_id).options(selectinload(Folder.files))
+    )
     folders = result.scalars().all()
     logger.info(f"[folder] LIST classroom_id={classroom_id} user_id={current_user.id} count={len(folders)}")
     return folders
