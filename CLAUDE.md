@@ -25,15 +25,15 @@ cd backend && .venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 0
 cd frontend && pnpm dev    # or: npm run dev
 ```
 
-Frontend runs on `:3000`, backend on `:8000`, Postgres on `:5433` (host) / `:5432` (container), Neo4j on `:7474` (browser) / `:7687` (bolt).
+Frontend runs on `:3000`, backend on `:8000`, Postgres on `:5433` (host) / `:5432` (container), Neo4j on `:7474` (browser) / `:7687` (bolt), ChromaDB on `:8001` (host) / `:8000` (container).
 
 ### Docker (full stack)
 ```bash
-docker compose up          # builds + starts db, neo4j, backend, frontend
-docker compose up db neo4j # just the data services — useful when running backend locally via start_dev.bat
+docker compose up                      # builds + starts db, neo4j, chroma, backend, frontend
+docker compose up -d db neo4j chroma   # just the data services — useful when running backend locally via start_dev.bat
 ```
 
-The compose setup mounts `backend/chroma_data` as a volume so vector data survives container restarts. Use `.env.docker` (copy from `.env.docker.example`).
+ChromaDB runs as its own container (`chromadb/chroma:0.4.24`, host port **8001** → container 8000) and the backend talks to it via HTTP (see Gotchas). Postgres / Neo4j / Chroma each have a named volume (`postgres_data`, `neo4j_data`, `chroma_data`) so data survives restarts. Use `.env.docker` (copy from `.env.docker.example`); for local-venv dev, the backend reads `CHROMA_HOST` (default `localhost`) and `CHROMA_PORT` (default `8001`) from `.env`.
 
 ### Database migrations
 ```bash
@@ -44,6 +44,18 @@ alembic downgrade -1                               # rollback one
 ```
 
 Note: `app.database.init_db.init_db()` also calls `Base.metadata.create_all()` on startup — this is a safety net, but Alembic is the source of truth for schema. RAG-layer tables (`rag_kv_store`, `rag_doc_status`) live only in the Alembic migration `b1c2d3e4f5a6_add_rag_tables.py`.
+
+**Fallback**: `scripts/reset_all_dbs.py` drops + recreates the `public` schema via asyncpg, runs `Base.metadata.create_all()`, and applies the RAG migration DDL inline — bypassing Alembic entirely. Use this when (a) you need a guaranteed clean slate for E2E runs, or (b) alembic can't load psycopg's `pq` DLL (see Smart App Control gotcha). Also wipes Neo4j and drops Chroma collections matching the connected instance.
+
+### E2E smoke test
+```bash
+# Full flow: signup → login → classroom → folder → upload → poll → ask, with per-stage timings
+.venv\Scripts\python.exe scripts\e2e_driver.py --file "..\Chapter1_HRM_With_Cartoons_Icons_and_Video.pptx" --out logs\e2e_report.json
+
+# Infra-only checks (Postgres / Neo4j / Chroma / OpenAI reachability)
+.venv\Scripts\python.exe scripts\smoke_test.py
+```
+`scripts/monitor_session.py` and `scripts/watch_kg.py` give live KG + Postgres telemetry during ingestion; `scripts/backend_log_tail.py` greps the backend log for errors in real time.
 
 ### Tests
 ```bash
@@ -91,8 +103,8 @@ This is a from-scratch port/implementation of LightRAG's graph-based RAG, not an
 - `operate.py` — pure functions: `chunking_by_token_size`, `extract_entities`, `merge_nodes_and_edges`, `kg_query`, `naive_query`. `kg_query` uses **multi-hop graph traversal**: after ChromaDB finds seed entities by vector similarity, `_expand_graph_neighbors()` calls `get_neighbors_with_scores()` BFS on Neo4j to discover related entities up to `traversal_hops` hops away, scoring by product(edge_weights)/hop_count. Chunk IDs for both seeds and neighbors are pulled from the `entity_chunks` KV namespace (complete list) rather than the node's `source_id` field (truncated at 50). `DEFAULT_CHUNK_TOKEN_SIZE = 800` (not 1200).
 - `storage/` — concrete backends:
   - `postgres_kv.py` — shared JSONB KV store (`rag_kv_store` table) for 7 namespaces (`full_docs`, `text_chunks`, `llm_response_cache`, `full_entities`, `full_relations`, `entity_chunks`, `relation_chunks`). Uses **asyncpg** (separate connection pool from SQLAlchemy's psycopg — see env vars `DATABASE_URL` vs `ASYNCPG_DATABASE_URL`).
-  - `chroma_vector.py` — ChromaDB collections for `entities`, `relationships`, `chunks`. Entity `content` field stores `"entity_name\ndescription"` — seed entity descriptions are parsed from this at query time (no Neo4j round-trip needed for seeds).
-  - `neo4j_graph.py` — knowledge graph (chunk ↔ entity ↔ relation). `get_neighbors_with_scores()` performs single-query BFS with weighted path scoring via Cypher `MATCH (seed)-[r*1..N]-(neighbor)`.
+  - `chroma_vector.py` — ChromaDB collections for `entities`, `relationships`, `chunks`, via **`chromadb.HttpClient`** against the standalone `chroma` container (NOT `PersistentClient` — see Smart App Control gotcha). Telemetry forced off via `Settings(anonymized_telemetry=False)`. Entity `content` field stores `"entity_name\ndescription"` — seed entity descriptions are parsed from this at query time (no Neo4j round-trip needed for seeds).
+  - `neo4j_graph.py` — knowledge graph (chunk ↔ entity ↔ relation). `get_neighbors_with_scores()` performs single-query BFS with weighted path scoring via Cypher `MATCH (seed)-[r*1..N]-(neighbor)`. Note: Neo4j 5.x requires **`size(r)`**, not `length(r)`, to count relationships in a variable-length path — `length()` expects a `Path`, not `List<Relationship>`, and the server raises a type-mismatch at query time.
   - `postgres_doc_status.py` — per-document pipeline status (`rag_doc_status` table).
 
 Shutdown is handled in `app/main.py`'s `lifespan` — it calls `classroom_rag_service.finalize_all()` and `close_pool()` to flush writes and close the asyncpg pool. Add any new per-engine teardown to `LightRAGEngine.finalize()`, not ad-hoc cleanup in routes.
@@ -101,7 +113,7 @@ Shutdown is handled in `app/main.py`'s `lifespan` — it calls `classroom_rag_se
 
 Dual-track ingestion: Docling parses bytes once, output is split into text vs. modal items (images, tables, equations), each runs concurrently.
 
-- `parser.py` — `parse_bytes()` + `separate_content()` wrap Docling. Uses `python-pptx` natively (no LibreOffice). Supports `.pdf`, `.docx`, `.pptx`, `.txt`.
+- `parser.py` — `parse_bytes()` + `separate_content()` wrap Docling. Uses `python-pptx` natively (no LibreOffice). Supports `.pdf`, `.docx`, `.pptx`, `.txt`. Has two Windows-specific workarounds installed at module top (see SAC gotcha below) and a `_extract_pptx_media()` helper that pulls raster images directly from the PPTX zip because Docling's PPTX backend yields zero `PictureItem`s.
 - `processors.py` — `ImageModalProcessor`, `TableModalProcessor`, `EquationModalProcessor`. Images/tables go through the vision model (`gpt-4o` via `openai_vision_func`); equations go through the LLM.
 - `pipeline.py` — `MultimodalPipeline.process_document()` owns a temp dir that must outlive modal processing (Docling writes image files to disk that the vision processor later base64-encodes; cleaning up too early was a real past bug — see comments at `pipeline.py:112`). Text insert uses `split_by_character="\n\n"` to honor slide/paragraph boundaries before falling back to token splitting. Modal concurrency is capped at `asyncio.Semaphore(6)`.
 
@@ -134,3 +146,9 @@ Backend CI spins up Postgres 16 + Neo4j 5.18 as services, runs `alembic upgrade 
 - **File URLs are citation keys**: don't rename `file.file_url` or change its shape without rewriting stored KB data — it's embedded in graph node properties and vector metadata.
 - **Legacy commented code**: `routes/file.py` has a very large block of commented-out old implementation at the bottom. Leave it alone unless deliberately cleaning up — it's been intentionally preserved during the RAG refactor.
 - **Package managers on frontend**: both `pnpm-lock.yaml` and `package-lock.json` exist. Pick one per session — the CICD guide uses pnpm.
+- **Windows Smart App Control (SAC)**: on dev machines with SAC enabled, Windows blocks unsigned native `.pyd`/DLL loads. Three specific modules were affected and have workarounds in place:
+  1. `chromadb`'s `hnswlib.pyd` — fixed by running chroma in Docker and using `HttpClient` instead of `PersistentClient`.
+  2. `psycopg`'s `pq` DLL (used by alembic) — fixed by `scripts/reset_all_dbs.py`, which uses asyncpg only.
+  3. `docling_parse.pdf_parsers.pyd` and transformers' `StoppingCriteria` lazy cascade — `backend/app/multimodal/parser.py` installs a `sys.modules` stub for the first and force-populates the transformers module dict for the second. Both are inert on non-SAC machines. PPTX/DOCX/TXT still work; only PDF upload raises a clear error when the stub is active.
+  Symptom to recognize: `ImportError: DLL load failed while importing <module>: A dynamic link library (DLL) initialization routine failed.` with `SmartAppControlState: On` in `Get-MpComputerStatus`.
+- **ChromaDB telemetry noise**: chromadb 0.4.24 × posthog 7.x have an ABI mismatch (`capture() takes 1 positional argument but 3 were given`). `Settings(anonymized_telemetry=False)` silences post-init events, and `_configure_logging()` in `app/main.py` sets `chromadb.telemetry.product.posthog` to CRITICAL to suppress the one constructor-time `ClientStartEvent` that fires before Settings is read.
