@@ -20,6 +20,29 @@ services:
     networks:
       - app-network
 
+  # ChromaDB vector store (runs as HTTP server so backend can use HttpClient instead
+  # of PersistentClient; PersistentClient pulls in hnswlib.pyd which is blocked on
+  # machines with Smart App Control enabled).
+  chroma:
+    image: chromadb/chroma:0.4.24
+    container_name: learning-sampai-chroma
+    ports:
+      - "8001:8000"
+    environment:
+      ANONYMIZED_TELEMETRY: "FALSE"
+      IS_PERSISTENT: "TRUE"
+    volumes:
+      - chroma_data:/chroma/chroma
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - app-network
+
   # Neo4j Knowledge Graph
   neo4j:
     image: neo4j:5.18-community
@@ -87,6 +110,7 @@ volumes:
   postgres_data:
   neo4j_data:
   neo4j_logs:
+  chroma_data:
 
 networks:
   app-network:

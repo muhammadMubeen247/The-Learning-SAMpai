@@ -159,10 +159,16 @@ async def check_neo4j():
 
 def check_chromadb():
     import chromadb
-    data_dir = os.environ.get("CHROMA_DATA_DIR", "./chroma_data")
-    client = chromadb.PersistentClient(path=data_dir)
+    from chromadb.config import Settings
+    host = os.environ.get("CHROMA_HOST", "localhost")
+    port = int(os.environ.get("CHROMA_PORT", "8001"))
+    client = chromadb.HttpClient(
+        host=host,
+        port=port,
+        settings=Settings(anonymized_telemetry=False),
+    )
     cols = client.list_collections()
-    return f"{len(cols)} existing collections in {data_dir}"
+    return f"{len(cols)} existing collections at http://{host}:{port}"
 
 
 async def check_openai_embedding():

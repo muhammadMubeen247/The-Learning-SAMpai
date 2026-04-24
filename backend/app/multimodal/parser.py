@@ -11,11 +11,81 @@ Content item schema (list of dicts):
 from __future__ import annotations
 
 import base64
+import sys
 import tempfile
+import types
 from pathlib import Path
 from typing import Any
 
 from app.rag.utils import logger
+
+
+# ── SAC (Smart App Control) workaround ────────────────────────────────────────
+# docling's DocumentConverter eagerly imports the PDF backend, which pulls in
+# `docling_parse.pdf_parsers` — a compiled .pyd that is unsigned and blocked
+# by Windows Smart App Control on some dev machines. We're only parsing
+# .pptx/.docx/.txt here (which don't hit the PDF decoder at runtime), so we
+# stub the module so the import chain succeeds. If anything actually tries to
+# use these symbols (i.e. someone uploads a PDF on a SAC-enabled box), they'll
+# get a clear RuntimeError instead of a cryptic DLL error.
+def _install_docling_pdf_stub() -> None:
+    modname = "docling_parse.pdf_parsers"
+    try:
+        __import__(modname)
+        return  # real module loaded fine
+    except ImportError as e:
+        if "Application Control" not in str(e):
+            return  # some other import error — don't mask it
+
+    class _StubModule(types.ModuleType):
+        def __getattr__(self, name: str):
+            if name.startswith(("TIMING_KEY_", "TIMING_PREFIX_")):
+                return name
+            if name.startswith("get_"):
+                def _f(*a, **kw): return []
+                return _f
+            if name.startswith("is_"):
+                def _f(*a, **kw): return False
+                return _f
+            class _PdfUnavailable:
+                def __init__(self, *a, **kw):
+                    raise RuntimeError(
+                        f"PDF parsing is disabled (SAC blocked docling_parse.pdf_parsers); "
+                        f"attempted to use {name!r}"
+                    )
+            _PdfUnavailable.__name__ = name
+            return _PdfUnavailable
+
+    sys.modules[modname] = _StubModule(modname)
+    logger.warning(
+        "parser.py: stubbed docling_parse.pdf_parsers (SAC-blocked .pyd). "
+        "Non-PDF formats (pptx/docx/txt) still work."
+    )
+
+
+_install_docling_pdf_stub()
+
+
+# ── transformers lazy-loader nudge ────────────────────────────────────────────
+# docling.datamodel.pipeline_options_vlm_model does `from transformers import
+# StoppingCriteria` deep inside a chain triggered by importing DocumentConverter.
+# transformers 5.x uses a _LazyModule that resolves attributes via __getattr__
+# but does NOT cache the resolved value back into the module dict — so when
+# docling's import cascade requests it mid-chain, the lazy loader misroutes
+# and raises ModuleNotFoundError. Force-install the real class into the module
+# dict so `from transformers import StoppingCriteria` finds it directly.
+try:
+    import transformers as _tf
+    from transformers.generation.stopping_criteria import (
+        StoppingCriteria as _StoppingCriteria,
+        StoppingCriteriaList as _StoppingCriteriaList,
+        MaxLengthCriteria as _MaxLengthCriteria,
+    )
+    _tf.StoppingCriteria = _StoppingCriteria
+    _tf.StoppingCriteriaList = _StoppingCriteriaList
+    _tf.MaxLengthCriteria = _MaxLengthCriteria
+except Exception as _e:
+    logger.debug(f"parser.py: transformers eager patch skipped: {_e}")
 
 
 def _convert_with_docling(file_path: Path, image_dir: Path) -> list[dict[str, Any]]:
@@ -233,10 +303,84 @@ def parse_bytes(
         logger.error(f"Docling parse_bytes failed for '{filename}': {e}")
         raise
 
+    # PPTX augmentation: docling's MsPowerpoint backend yields only text/tables
+    # and does not surface embedded images. Pull them from the archive directly.
+    if filename.lower().endswith(".pptx"):
+        try:
+            extra = _extract_pptx_media(input_path, image_dir)
+            if extra:
+                logger.info(
+                    f"pptx media pass added {len(extra)} image item(s) for '{filename}'"
+                )
+                content_list.extend(extra)
+        except Exception as e:
+            logger.warning(f"pptx media extraction failed for '{filename}': {e}")
+
     logger.info(
         f"Docling parsed '{filename}': {len(content_list)} content blocks"
     )
     return content_list
+
+
+def _extract_pptx_media(pptx_path: Path, image_dir: Path) -> list[dict[str, Any]]:
+    """
+    Extract raster images from ppt/media/ inside the PPTX archive and return
+    them as content_list image items. Also parses slide→rel mappings so each
+    image carries the slide number it first appears on.
+    """
+    import zipfile
+    from xml.etree import ElementTree as ET
+
+    image_dir.mkdir(parents=True, exist_ok=True)
+    items: list[dict[str, Any]] = []
+
+    # Extensions the vision model can handle natively.
+    RASTER_EXTS = (".jpeg", ".jpg", ".png", ".gif", ".webp", ".bmp")
+
+    with zipfile.ZipFile(str(pptx_path)) as zf:
+        # Map image filename -> list of slide indices that reference it.
+        slide_rels = [n for n in zf.namelist()
+                      if n.startswith("ppt/slides/_rels/slide") and n.endswith(".xml.rels")]
+        image_to_slides: dict[str, list[int]] = {}
+        for rel_name in sorted(slide_rels):
+            # e.g. ppt/slides/_rels/slide3.xml.rels -> slide_no = 3
+            try:
+                slide_no = int(rel_name.split("slide")[-1].split(".")[0])
+            except ValueError:
+                continue
+            try:
+                xml = zf.read(rel_name).decode("utf-8", errors="replace")
+                root = ET.fromstring(xml)
+            except Exception:
+                continue
+            for rel in root:
+                target = rel.get("Target", "")
+                if "media/image" in target:
+                    base = target.split("/")[-1].lower()
+                    image_to_slides.setdefault(base, []).append(slide_no)
+
+        # Extract every raster image.
+        media_entries = [
+            n for n in zf.namelist()
+            if n.startswith("ppt/media/") and n.lower().endswith(RASTER_EXTS)
+        ]
+        for m in sorted(media_entries):
+            data = zf.read(m)
+            basename = m.split("/")[-1]
+            out_path = image_dir / basename
+            out_path.write_bytes(data)
+            base_lc = basename.lower()
+            slides = image_to_slides.get(base_lc, [])
+            page_idx = (slides[0] - 1) if slides else 0
+            items.append({
+                "type": "image",
+                "img_path": str(out_path.resolve()),
+                "image_caption": "",
+                "image_footnote": "",
+                "page_idx": page_idx,
+            })
+
+    return items
 
 
 def parse_file(

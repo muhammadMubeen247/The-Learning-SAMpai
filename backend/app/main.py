@@ -57,6 +57,14 @@ def _configure_logging() -> None:
         lg.propagate = True
         lg.handlers = []
 
+    # chromadb 0.4.24 emits a single ClientStartEvent via posthog 7.x before
+    # its Settings(anonymized_telemetry=False) has been applied. The call
+    # fails with "capture() takes 1 positional argument but 3 were given"
+    # and is logged at ERROR. Post-init events are correctly silenced by
+    # our Settings, so this one line is cosmetic noise. Keep CRITICAL so
+    # future real issues from that logger still surface.
+    logging.getLogger("chromadb.telemetry.product.posthog").setLevel(logging.CRITICAL)
+
 from app.database.init_db import init_db
 from app.routes import auth, classroom, folder, file, chat
 

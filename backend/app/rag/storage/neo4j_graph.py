@@ -411,7 +411,7 @@ class Neo4jGraphStorage(BaseGraphStorage):
               AND neighbor.entity_id IS NOT NULL
               AND NOT neighbor.entity_id IN $exclude_ids
             WITH neighbor,
-                 length(r) AS hops,
+                 size(r) AS hops,
                  reduce(w = 1.0, rel IN r |
                      w * coalesce(toFloat(rel.weight), 1.0)
                  ) AS path_weight

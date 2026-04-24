@@ -1,6 +1,15 @@
 """
 ChromaDB vector storage adapter implementing BaseVectorStorage.
-Replaces LangChain's Chroma wrapper with a direct chromadb.PersistentClient.
+
+Uses chromadb.HttpClient against a standalone chroma container (see
+docker-compose.yml). HttpClient sidesteps the hnswlib native binary (.pyd)
+that PersistentClient loads in-process — that binary is unsigned and is
+blocked by Windows Smart App Control on some dev machines. The server in
+Docker has the binary and accepts plain HTTP requests.
+
+Telemetry is disabled via Settings(anonymized_telemetry=False) to eliminate
+the `posthog.capture() takes 1 positional argument but 3 were given` error
+caused by the chromadb 0.4.24 / posthog 7.x ABI mismatch.
 
 Collection naming convention: {workspace}__{namespace}
 Example: classroom_7__entities, classroom_7__relationships, classroom_7__chunks
@@ -12,21 +21,27 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import chromadb
+from chromadb.config import Settings
 import numpy as np
 
 from app.rag.base import BaseVectorStorage
 from app.rag.utils import logger
 
 # Module-level singleton client
-_chroma_client: chromadb.PersistentClient | None = None
+_chroma_client: chromadb.ClientAPI | None = None
 
 
-def _get_chroma_client() -> chromadb.PersistentClient:
+def _get_chroma_client() -> chromadb.ClientAPI:
     global _chroma_client
     if _chroma_client is None:
-        chroma_dir = os.getenv("CHROMA_DATA_DIR", "./chroma_data")
-        _chroma_client = chromadb.PersistentClient(path=chroma_dir)
-        logger.info(f"ChromaDB PersistentClient initialized at {chroma_dir}")
+        host = os.getenv("CHROMA_HOST", "localhost")
+        port = int(os.getenv("CHROMA_PORT", "8001"))
+        _chroma_client = chromadb.HttpClient(
+            host=host,
+            port=port,
+            settings=Settings(anonymized_telemetry=False),
+        )
+        logger.info(f"ChromaDB HttpClient initialized at http://{host}:{port}")
     return _chroma_client
 
 

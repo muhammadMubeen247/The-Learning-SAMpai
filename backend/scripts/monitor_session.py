@@ -5,12 +5,21 @@ Flags anomalies and prints a final report when you Ctrl+C.
 Usage (from backend/ directory, with env vars set or after start_dev.bat):
     .venv\Scripts\python.exe scripts\monitor_session.py
 """
+import io
 import os
 import sys
 import time
 import asyncio
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
+
+# When stdout is redirected on Windows, Python picks cp1252 and chokes on the
+# box-drawing characters we print. Force UTF-8 so redirected runs don't spew
+# 'charmap' codec errors.
+if hasattr(sys.stdout, "buffer"):
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "buffer"):
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 # ── connection settings ────────────────────────────────────────────────────────
 NEO4J_URI  = os.getenv("NEO4J_URI",      "bolt://localhost:7687")
@@ -149,11 +158,12 @@ async def check_postgres():
         now = datetime.now(timezone.utc)
         five_min_ago = now - timedelta(minutes=5)
         stuck = await pg_query(
-            f"SELECT id, name, status, updated_at FROM files "
-            f"WHERE status = 'PROCESSING' AND updated_at < '{five_min_ago.isoformat()}'"
+            f"SELECT id, filename AS name, processing_status AS status, processed_at AS updated_at FROM files "
+            f"WHERE processing_status = 'PROCESSING' AND processed_at < '{five_min_ago.isoformat()}'"
         )
         failed = await pg_query(
-            "SELECT id, name, status, updated_at FROM files WHERE status = 'FAILED'"
+            "SELECT id, filename AS name, processing_status AS status, processed_at AS updated_at FROM files "
+            "WHERE processing_status = 'FAILED'"
         )
         return list(status_rows), list(stuck), list(failed)
     except Exception as e:
