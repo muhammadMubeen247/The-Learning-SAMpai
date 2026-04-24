@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String,Text, ForeignKey, DateTime, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime, Enum as SQLEnum
 from sqlalchemy.orm import relationship
 from app.database.base import Base
 from datetime import datetime
@@ -29,7 +29,8 @@ class File(Base):
     folder_id = Column(Integer, ForeignKey("folders.id"), nullable=False)
     uploaded_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     processed_at = Column(DateTime, nullable=True)  # When processing completed
-    
+    rag_doc_id = Column(String(512), nullable=True)  # LightRAG document hash ID
+
     # Relationships
     folder = relationship("Folder", back_populates="files")
-    topics = relationship("Topic", back_populates="file", cascade="all, delete-orphan")
+    chat_messages = relationship("ChatMessage", back_populates="file", cascade="all, delete-orphan")

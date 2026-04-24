@@ -1,5 +1,9 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
 from app.database.session import get_db
 from app.models.folder import Folder
 from app.models.classroom import Classroom
@@ -7,10 +11,18 @@ from app.schemas.folder import FolderCreate, FolderOut
 from app.dependencies.auth import get_current_user
 
 router = APIRouter(prefix="/folders", tags=["folders"])
+logger = logging.getLogger(__name__)
+
 
 @router.post("/classroom/{classroom_id}", response_model=FolderOut)
-def create_folder(classroom_id: int, folder: FolderCreate, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
-    classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
+async def create_folder(
+    classroom_id: int,
+    folder: FolderCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    result = await db.execute(select(Classroom).where(Classroom.id == classroom_id))
+    classroom = result.scalar_one_or_none()
     if not classroom:
         raise HTTPException(status_code=404, detail="Classroom not found")
 
@@ -19,14 +31,27 @@ def create_folder(classroom_id: int, folder: FolderCreate, db: Session = Depends
 
     new_folder = Folder(name=folder.name, classroom_id=classroom_id)
     db.add(new_folder)
-    db.commit()
-    db.refresh(new_folder)
+    await db.commit()
+    await db.refresh(new_folder)
+    logger.info(
+        f"[folder] CREATE folder_id={new_folder.id} name='{new_folder.name}' "
+        f"classroom_id={classroom_id} user_id={current_user.id}"
+    )
     return new_folder
 
+
 @router.get("/classroom/{classroom_id}", response_model=list[FolderOut])
-def get_folders(classroom_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
-    classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
+async def get_folders(
+    classroom_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    result = await db.execute(select(Classroom).where(Classroom.id == classroom_id))
+    classroom = result.scalar_one_or_none()
     if not classroom:
         raise HTTPException(status_code=404, detail="Classroom not found")
 
-    return classroom.folders
+    result = await db.execute(select(Folder).where(Folder.classroom_id == classroom_id))
+    folders = result.scalars().all()
+    logger.info(f"[folder] LIST classroom_id={classroom_id} user_id={current_user.id} count={len(folders)}")
+    return folders

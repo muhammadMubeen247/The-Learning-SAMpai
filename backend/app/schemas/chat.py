@@ -10,11 +10,9 @@ class QuestionRequest(BaseModel):
 
 
 class SourceInfo(BaseModel):
-    """Information about a source chunk"""
-    file_id: int
-    page_number: Optional[int]
-    slide_number: Optional[int]
-    content_preview: str
+    """Information about a source file referenced in the RAG response."""
+    file_path: str
+    content_preview: Optional[str] = None
 
 
 class QuestionResponse(BaseModel):
@@ -29,7 +27,7 @@ class QuestionResponse(BaseModel):
 class ChatMessageOut(BaseModel):
     """Chat message output"""
     id: int
-    topic_id: int
+    file_id: int
     user_id: int
     role: str
     content: str

@@ -45,3 +45,9 @@ node_modules/
 # ChromaDB data
 chroma_data/
 *.db
+
+# Logs
+backend/logs/
+
+#Claude
+.claude/

@@ -6,11 +6,11 @@ class ChatMessageBase(BaseModel):
     content: str
 
 class ChatMessageCreate(ChatMessageBase):
-    topic_id: int
+    file_id: int
 
 class ChatMessageOut(ChatMessageBase):
     id: int
-    topic_id: int
+    file_id: int
     user_id: int
     role: str
     timestamp: datetime

@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional, List
-from app.schemas.topic import TopicOut
+from typing import Optional
+
 
 class FileBase(BaseModel):
     filename: str
@@ -20,14 +20,6 @@ class FileOut(FileBase):
     folder_id: int
     uploaded_at: datetime
     processed_at: Optional[datetime]
-
-    class Config:
-        from_attributes = True
-
-
-class FileWithTopics(FileOut):
-    """File with embedded topics"""
-    topics: List[TopicOut] = []
 
     class Config:
         from_attributes = True

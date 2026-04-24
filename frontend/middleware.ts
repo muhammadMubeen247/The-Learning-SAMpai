@@ -14,24 +14,18 @@ const authRoutes = ['/login', '/signup']
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
-  
-  // Check if the current route is protected
-  const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
-  const isAuthRoute = authRoutes.some(route => pathname.startsWith(route))
-  
-  // Get the token from cookies (if you're using cookies)
-  // For now, we'll skip cookie check since tokens are in localStorage
-  // This middleware will mainly handle redirects for known patterns
-  
-  // Allow public routes
+  const method = request.method
+
+  // Log every page navigation to the Next.js terminal
+  console.log(`[NAV] ${new Date().toISOString()} ${method} ${pathname}`)
+
+  // Allow public routes (no auth needed)
   if (pathname === '/' || pathname.startsWith('/_next') || pathname.startsWith('/api')) {
     return NextResponse.next()
   }
-  
+
   // For protected routes, let the client-side handle authentication
   // since we're using localStorage for tokens
-  // This middleware serves as a first-line check
-  
   return NextResponse.next()
 }
 

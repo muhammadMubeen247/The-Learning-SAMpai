@@ -161,7 +161,7 @@ export default function FilesSection({ classroomId, folderId, isOwner, onFileUpl
 
     if (typeof window !== "undefined") {
       const confirmed = window.confirm(
-        `Are you sure you want to delete "${filename}"?\nThis will remove the file and its topics permanently.`
+        `Are you sure you want to delete "${filename}"?\nThis will remove the file and its chat history permanently.`
       )
       if (!confirmed) return
     }

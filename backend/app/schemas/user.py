@@ -16,7 +16,7 @@ class UserCreate(BaseModel):
     def validate_password(cls, v):
         if len(v.encode('utf-8')) > 72:
             raise ValueError('password must be less than 72 bytes when encoded in utf-8')
-        if not re.match("^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*#?&]{8,}$", v):
+        if not re.match(r"^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*#?&]{8,}$", v):
             raise ValueError('password must contain at least one letter and one number')
         return v
 

@@ -4,7 +4,7 @@ const API = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000",
 });
 
-// Attach token automatically if it exists
+// Attach token and log request
 API.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
     const token = localStorage.getItem("token");
@@ -14,21 +14,31 @@ API.interceptors.request.use((config) => {
   }
   // For FormData, let axios set Content-Type with boundary automatically
   if (config.data instanceof FormData) {
-    // Remove any manually set Content-Type to let axios handle it
     delete config.headers["Content-Type"];
   }
+  // Record request start time for elapsed logging
+  (config as any)._requestStart = Date.now();
+  console.log(`[API →] ${config.method?.toUpperCase()} ${config.url}`);
   return config;
 });
 
-// Add response interceptor for better error handling
+// Log response or error
 API.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const elapsed = Date.now() - ((response.config as any)._requestStart || Date.now());
+    console.log(
+      `[API ✓] ${response.config.method?.toUpperCase()} ${response.config.url} ${response.status} (${elapsed}ms)`
+    );
+    return response;
+  },
   (error) => {
+    const elapsed = Date.now() - ((error.config as any)?._requestStart || Date.now());
+    console.log(
+      `[API ✗] ${error.config?.method?.toUpperCase()} ${error.config?.url} ${error.response?.status ?? "ERR"} (${elapsed}ms)`
+    );
     if (error.response?.status === 401 && typeof window !== "undefined") {
-      // Clear auth data on 401
       localStorage.removeItem("token");
       localStorage.removeItem("user");
-      // Redirect to login
       if (window.location.pathname !== "/login") {
         window.location.href = "/login";
       }

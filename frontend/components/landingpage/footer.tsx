@@ -1,6 +1,6 @@
 "use client"
 
-import { Github, Linkedin, Mail } from "lucide-react"
+import { Globe, Users, Mail } from "lucide-react"
 
 export function Footer() {
   return (
@@ -77,10 +77,10 @@ export function Footer() {
           <p className="text-sm text-muted-foreground">© 2025 The Learning SAMpai. All rights reserved.</p>
           <div className="flex items-center space-x-4">
             <a href="#" className="text-muted-foreground hover:text-foreground transition-colors" aria-label="GitHub">
-              <Github className="w-5 h-5" />
+              <Globe className="w-5 h-5" />
             </a>
             <a href="#" className="text-muted-foreground hover:text-foreground transition-colors" aria-label="LinkedIn">
-              <Linkedin className="w-5 h-5" />
+              <Users className="w-5 h-5" />
             </a>
             <a href="#" className="text-muted-foreground hover:text-foreground transition-colors" aria-label="Email">
               <Mail className="w-5 h-5" />
