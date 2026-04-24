@@ -14,6 +14,11 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+load_dotenv(
+    dotenv_path=os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"),
+    override=True,
+)
+
 
 def _configure_logging() -> None:
     """
@@ -54,11 +59,6 @@ def _configure_logging() -> None:
 
 from app.database.init_db import init_db
 from app.routes import auth, classroom, folder, file, chat
-
-load_dotenv(
-    dotenv_path=os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"),
-    override=True,
-)
 
 
 @asynccontextmanager
