@@ -137,8 +137,19 @@ class ChromaVectorStorage(BaseVectorStorage):
         query: str,
         top_k: int,
         query_embedding: list[float] | None = None,
+        file_filter: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Query vector storage, returns top_k results with metadata."""
+        """Query vector storage, returns top_k results with metadata.
+
+        file_filter: when set, restrict results to items originating from
+        this file_path. For the ``chunks`` namespace each item carries a
+        single canonical file_path → use Chroma's native ``where`` clause.
+        For ``entities``/``relationships`` an item's file_path may be a
+        GRAPH_FIELD_SEP-joined list of files contributing to the merged
+        record, so we over-fetch and post-filter in Python.
+        """
+        from app.rag.constants import GRAPH_FIELD_SEP
+
         collection = self._get_collection()
 
         if query_embedding is None:
@@ -153,15 +164,31 @@ class ChromaVectorStorage(BaseVectorStorage):
             )
             return []
 
+        # Decide retrieval strategy based on file_filter and namespace.
+        # `chunks` stores a single file_path per row → native filter is exact.
+        # `entities`/`relationships` may store a joined list → over-fetch and
+        # post-filter on the python side.
+        use_native_where = file_filter is not None and self.namespace == "chunks"
+        post_filter = file_filter is not None and not use_native_where
+
+        # Over-fetch when post-filtering so we don't drop below top_k.
+        fetch_n = top_k * 4 if post_filter else top_k
+        n_results = min(fetch_n, count)
+
         logger.debug(
-            "[%s/%s] query: top_k=%d collection_count=%d query='%s...'",
-            self.workspace, self.namespace, top_k, count, query[:40],
+            "[%s/%s] query: top_k=%d fetch_n=%d collection_count=%d "
+            "file_filter=%s query='%s...'",
+            self.workspace, self.namespace, top_k, fetch_n, count,
+            "yes" if file_filter else "no", query[:40],
         )
-        results = collection.query(
-            query_embeddings=[query_embedding],
-            n_results=min(top_k, count),
-            include=["documents", "metadatas", "distances"],
-        )
+        query_kwargs: dict[str, Any] = {
+            "query_embeddings": [query_embedding],
+            "n_results": n_results,
+            "include": ["documents", "metadatas", "distances"],
+        }
+        if use_native_where:
+            query_kwargs["where"] = {"file_path": file_filter}
+        results = collection.query(**query_kwargs)
 
         if not results["ids"] or not results["ids"][0]:
             return []
@@ -178,8 +205,16 @@ class ChromaVectorStorage(BaseVectorStorage):
             meta = results["metadatas"][0][i] if results["metadatas"] else {}
             doc = results["documents"][0][i] if results["documents"] else ""
 
+            if post_filter:
+                stored_fp = (meta.get("file_path") or "") if meta else ""
+                stored_paths = [p for p in stored_fp.split(GRAPH_FIELD_SEP) if p]
+                if file_filter not in stored_paths:
+                    continue
+
             item = {"id": doc_id, "content": doc, "distance": distance, **meta}
             output.append(item)
+            if len(output) >= top_k:
+                break
 
         logger.debug(
             "[%s/%s] query: returned %d results (threshold=%.2f)",

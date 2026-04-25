@@ -1205,28 +1205,8 @@ async def extract_keywords_only(
 
 
 def _parse_json_robust(text: str) -> dict | None:
-    """Try to parse JSON from LLM output; use json_repair if available."""
-    if not text:
-        return None
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        pass
-    if _HAS_JSON_REPAIR:
-        try:
-            result = json_repair.loads(text)
-            if isinstance(result, dict):
-                return result
-        except Exception:
-            pass
-    # Fallback: look for JSON object in text
-    match = __import__("re").search(r"\{.*?\}", text, __import__("re").DOTALL)
-    if match:
-        try:
-            return json.loads(match.group())
-        except Exception:
-            pass
-    return None
+    from app.rag.utils import parse_json_robust
+    return parse_json_robust(text)
 
 
 # ---------------------------------------------------------------------------
@@ -1251,7 +1231,9 @@ async def _get_entity_context(
     if not keywords:
         return [], []
 
-    entity_results = await entities_vdb.query(keywords, top_k=query_param.top_k)
+    entity_results = await entities_vdb.query(
+        keywords, top_k=query_param.top_k, file_filter=query_param.file_filter,
+    )
     if not entity_results:
         return [], []
 
@@ -1329,6 +1311,7 @@ async def _expand_graph_neighbors(
         max_hops=query_param.traversal_hops,
         max_results=query_param.max_graph_neighbors,
         exclude_ids=set(seed_names),
+        file_filter=query_param.file_filter,
     )
 
     neighbor_nodes: list[dict] = []
@@ -1383,7 +1366,9 @@ async def _get_relation_context(
         return [], []
 
     top_k = query_param.top_k
-    rel_results = await relationships_vdb.query(keywords, top_k=top_k)
+    rel_results = await relationships_vdb.query(
+        keywords, top_k=top_k, file_filter=query_param.file_filter,
+    )
     if not rel_results:
         return [], []
 
@@ -1439,6 +1424,15 @@ async def _fetch_text_chunks(
     for chunk in raw_chunks:
         if chunk and chunk.get("content"):
             valid_chunks.append(chunk)
+
+    # Defensive file_filter: an entity merged across files holds chunk IDs
+    # from each contributing file; if the caller restricted retrieval to a
+    # single file, drop any chunks whose stored file_path doesn't match.
+    if query_param.file_filter:
+        valid_chunks = [
+            c for c in valid_chunks
+            if c.get("file_path") == query_param.file_filter
+        ]
 
     # Token-aware truncation
     truncated = truncate_list_by_token_size(
@@ -1573,7 +1567,9 @@ async def kg_query(
     vector_chunks: list[dict] = []
     if mode == "mix" and chunks_vdb is not None:
         search_top_k = query_param.chunk_top_k or query_param.top_k
-        v_results = await chunks_vdb.query(query, top_k=search_top_k)
+        v_results = await chunks_vdb.query(
+            query, top_k=search_top_k, file_filter=query_param.file_filter,
+        )
         for v in v_results:
             if v.get("content"):
                 vector_chunks.append({
@@ -1683,7 +1679,9 @@ async def naive_query(
     search_top_k = query_param.chunk_top_k or query_param.top_k
     max_total_tokens = query_param.max_total_tokens or DEFAULT_MAX_TOTAL_TOKENS
 
-    results = await chunks_vdb.query(query, top_k=search_top_k)
+    results = await chunks_vdb.query(
+        query, top_k=search_top_k, file_filter=query_param.file_filter,
+    )
     if not results:
         logger.info("[naive_query] No chunks found.")
         return None

@@ -452,6 +452,38 @@ def make_relation_chunk_key(src: str, tgt: str) -> str:
     return GRAPH_FIELD_SEP.join(sorted([src, tgt]))
 
 
+try:
+    import json_repair as _json_repair_mod
+    _HAS_JSON_REPAIR = True
+except ImportError:
+    _json_repair_mod = None  # type: ignore[assignment]
+    _HAS_JSON_REPAIR = False
+
+
+def parse_json_robust(text: str) -> dict | None:
+    """Parse JSON from LLM output, using json_repair as fallback."""
+    if not text:
+        return None
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    if _HAS_JSON_REPAIR:
+        try:
+            result = _json_repair_mod.loads(text)
+            if isinstance(result, dict):
+                return result
+        except Exception:
+            pass
+    match = re.search(r"\{.*?\}", text, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group())
+        except Exception:
+            pass
+    return None
+
+
 # ---------------------------------------------------------------------------
 # File path helpers for entity metadata
 # ---------------------------------------------------------------------------

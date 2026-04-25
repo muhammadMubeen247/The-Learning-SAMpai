@@ -11,6 +11,8 @@ import ClassroomSidebar from "@/components/classroom/sidebar"
 import ClassroomHeader from "@/components/classroom/header"
 import { LoadingOverlay } from "@/components/ui/liquid-orb-loader"
 import { Download, Send, Loader2, FileText, CheckCircle2, Clock, AlertCircle, RefreshCw } from "lucide-react"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { QuizPanel } from "@/components/quiz/QuizPanel"
 
 const Squares = dynamic(() => import("@/components/backgrounds/squares"), { ssr: false })
 
@@ -401,102 +403,117 @@ export default function FilePage() {
               )}
             </div>
 
-            {/* ── Chat section ── */}
-            <div className="flex-1 flex flex-col min-h-0 rounded-xl border border-border bg-card/50 backdrop-blur-sm overflow-hidden">
+            {/* ── Chat / Quiz tabs ── */}
+            <Tabs defaultValue="chat" className="flex-1 flex flex-col min-h-0">
+              <TabsList className="self-start mx-0 mb-1">
+                <TabsTrigger value="chat">Chat</TabsTrigger>
+                <TabsTrigger value="quiz">Quiz</TabsTrigger>
+              </TabsList>
 
-              {/* Messages scroll area */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {messages.length === 0 && (
-                  <div className="flex flex-col items-center justify-center h-full text-center gap-2 py-8">
-                    {canChat ? (
-                      <>
-                        <CheckCircle2 className="h-6 w-6 text-emerald-500" />
-                        <p className="text-sm font-medium text-foreground">Ready to answer questions</p>
-                        <p className="text-xs text-muted-foreground">Ask anything about this document below.</p>
-                      </>
-                    ) : isFailed ? (
-                      <>
-                        <AlertCircle className="h-6 w-6 text-destructive" />
-                        <p className="text-sm text-destructive">Processing failed.</p>
-                        <button onClick={handleReprocess}
-                          className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 cursor-pointer">
-                          <RefreshCw className="h-3.5 w-3.5" /> Retry
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">
-                          Processing document… Q&amp;A will be available shortly.
-                        </p>
-                        <p className="text-xs text-muted-foreground/60">
-                          Large files (PDF, PPTX) may take 2–5 minutes.
-                        </p>
-                      </>
+              <TabsContent value="chat" className="flex-1 flex flex-col min-h-0 mt-0">
+                <div className="flex-1 flex flex-col min-h-0 rounded-xl border border-border bg-card/50 backdrop-blur-sm overflow-hidden">
+
+                  {/* Messages scroll area */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    {messages.length === 0 && (
+                      <div className="flex flex-col items-center justify-center h-full text-center gap-2 py-8">
+                        {canChat ? (
+                          <>
+                            <CheckCircle2 className="h-6 w-6 text-emerald-500" />
+                            <p className="text-sm font-medium text-foreground">Ready to answer questions</p>
+                            <p className="text-xs text-muted-foreground">Ask anything about this document below.</p>
+                          </>
+                        ) : isFailed ? (
+                          <>
+                            <AlertCircle className="h-6 w-6 text-destructive" />
+                            <p className="text-sm text-destructive">Processing failed.</p>
+                            <button onClick={handleReprocess}
+                              className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 cursor-pointer">
+                              <RefreshCw className="h-3.5 w-3.5" /> Retry
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                            <p className="text-sm text-muted-foreground">
+                              Processing document… Q&amp;A will be available shortly.
+                            </p>
+                            <p className="text-xs text-muted-foreground/60">
+                              Large files (PDF, PPTX) may take 2–5 minutes.
+                            </p>
+                          </>
+                        )}
+                      </div>
                     )}
-                  </div>
-                )}
 
-                {messages.map((msg) => (
-                  <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                      msg.role === "user"
-                        ? "bg-primary text-primary-foreground rounded-br-sm"
-                        : "border border-border bg-card text-foreground rounded-bl-sm"
-                    }`}>
-                      <p className="whitespace-pre-wrap">{msg.content}</p>
+                    {messages.map((msg) => (
+                      <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                        <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                          msg.role === "user"
+                            ? "bg-primary text-primary-foreground rounded-br-sm"
+                            : "border border-border bg-card text-foreground rounded-bl-sm"
+                        }`}>
+                          <p className="whitespace-pre-wrap">{msg.content}</p>
+                        </div>
+                      </div>
+                    ))}
+
+                    {isAsking && (
+                      <div className="flex justify-start">
+                        <div className="rounded-2xl rounded-bl-sm border border-border bg-card px-4 py-3 text-sm text-muted-foreground flex items-center gap-2">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Thinking…
+                        </div>
+                      </div>
+                    )}
+
+                    <div ref={messagesEndRef} />
+                  </div>
+
+                  {/* Chat error */}
+                  {chatError && (
+                    <p className="px-4 pb-1 text-xs text-destructive shrink-0">{chatError}</p>
+                  )}
+
+                  {/* Input area — always visible */}
+                  <div className="shrink-0 border-t border-border bg-card/80 p-3">
+                    <div className="flex items-end gap-2">
+                      <textarea
+                        value={question}
+                        onChange={(e) => setQuestion(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        disabled={isAsking || !canChat}
+                        placeholder={
+                          isFailed
+                            ? "Processing failed — click Retry above"
+                            : isInProgress
+                            ? "Processing document… check back in a moment"
+                            : "Ask a question about this document… (Enter to send, Shift+Enter for new line)"
+                        }
+                        rows={2}
+                        className="flex-1 resize-none rounded-xl border border-border bg-background/60 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-40 disabled:cursor-not-allowed"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAsk}
+                        disabled={!question.trim() || isAsking || !canChat}
+                        className="shrink-0 flex items-center justify-center rounded-xl bg-primary w-11 h-11 text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                      >
+                        {isAsking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                      </button>
                     </div>
+                    <p className="mt-1.5 text-[11px] text-muted-foreground/60 px-1">
+                      {canChat ? "Enter to send · Shift+Enter for new line" : isInProgress ? "Processing in background…" : ""}
+                    </p>
                   </div>
-                ))}
-
-                {isAsking && (
-                  <div className="flex justify-start">
-                    <div className="rounded-2xl rounded-bl-sm border border-border bg-card px-4 py-3 text-sm text-muted-foreground flex items-center gap-2">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Thinking…
-                    </div>
-                  </div>
-                )}
-
-                <div ref={messagesEndRef} />
-              </div>
-
-              {/* Chat error */}
-              {chatError && (
-                <p className="px-4 pb-1 text-xs text-destructive shrink-0">{chatError}</p>
-              )}
-
-              {/* Input area — always visible */}
-              <div className="shrink-0 border-t border-border bg-card/80 p-3">
-                <div className="flex items-end gap-2">
-                  <textarea
-                    value={question}
-                    onChange={(e) => setQuestion(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    disabled={isAsking || !canChat}
-                    placeholder={
-                      isFailed
-                        ? "Processing failed — click Retry above"
-                        : isInProgress
-                        ? "Processing document… check back in a moment"
-                        : "Ask a question about this document… (Enter to send, Shift+Enter for new line)"
-                    }
-                    rows={2}
-                    className="flex-1 resize-none rounded-xl border border-border bg-background/60 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-40 disabled:cursor-not-allowed"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAsk}
-                    disabled={!question.trim() || isAsking || !canChat}
-                    className="shrink-0 flex items-center justify-center rounded-xl bg-primary w-11 h-11 text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                  >
-                    {isAsking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  </button>
                 </div>
-                <p className="mt-1.5 text-[11px] text-muted-foreground/60 px-1">
-                  {canChat ? "Enter to send · Shift+Enter for new line" : isInProgress ? "Processing in background…" : ""}
-                </p>
-              </div>
-            </div>
+              </TabsContent>
+
+              <TabsContent value="quiz" className="flex-1 flex flex-col min-h-0 mt-0">
+                <div className="flex-1 flex flex-col min-h-0 rounded-xl border border-border bg-card/50 backdrop-blur-sm overflow-hidden">
+                  <QuizPanel fileId={Number(fileId)} canQuiz={canChat} />
+                </div>
+              </TabsContent>
+            </Tabs>
 
           </div>
         </main>

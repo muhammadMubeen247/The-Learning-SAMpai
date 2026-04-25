@@ -68,6 +68,11 @@ class QueryParam:
     traversal_hops: int = 2
     max_graph_neighbors: int = 30
 
+    # When set, restrict retrieval to entities/relations/chunks originating
+    # from this single file_path. Used by quiz generation to keep questions
+    # grounded strictly in one document even though the KG is shared per-classroom.
+    file_filter: str | None = None
+
 
 # ---------------------------------------------------------------------------
 # Storage base classes
@@ -104,9 +109,19 @@ class BaseVectorStorage(StorageNameSpace, ABC):
 
     @abstractmethod
     async def query(
-        self, query: str, top_k: int, query_embedding: list[float] | None = None
+        self,
+        query: str,
+        top_k: int,
+        query_embedding: list[float] | None = None,
+        file_filter: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Query vector storage and return top_k results."""
+        """Query vector storage and return top_k results.
+
+        file_filter: when set, restrict results to items whose stored
+        ``file_path`` metadata matches (or, for stores where file_path is
+        a separator-joined list of files contributing to a merged record,
+        contains) this value.
+        """
 
     @abstractmethod
     async def upsert(self, data: dict[str, dict[str, Any]]) -> None:
@@ -283,15 +298,32 @@ class BaseGraphStorage(StorageNameSpace, ABC):
         max_hops: int = 2,
         max_results: int = 50,
         exclude_ids: set[str] | None = None,
+        file_filter: str | None = None,
     ) -> list[dict[str, Any]]:
         """BFS from seed entity_ids up to max_hops hops.
         Returns dicts with: entity_id, entity_type, description, source_id,
         file_path, hop_distance, best_score.
+
+        file_filter: when set, only include neighbors whose ``file_path``
+        property contains this value (entities can be merged across files,
+        so file_path is treated as a separator-joined list).
+
         This default implementation is a fallback for non-Neo4j backends;
         Neo4jGraphStorage overrides it with a single efficient Cypher query.
         """
         if not entity_ids:
             return []
+        # Local import to avoid circular dependency at module load.
+        from app.rag.constants import GRAPH_FIELD_SEP
+
+        def _matches_file(node: dict | None) -> bool:
+            if file_filter is None:
+                return True
+            if not node:
+                return False
+            fp = node.get("file_path") or ""
+            return file_filter in [p for p in fp.split(GRAPH_FIELD_SEP) if p]
+
         exclude = exclude_ids or set(entity_ids)
         visited: set[str] = set(entity_ids)
         frontier: list[str] = list(entity_ids)
@@ -308,7 +340,7 @@ class BaseGraphStorage(StorageNameSpace, ABC):
                         visited.add(neighbor)
                         next_frontier.append(neighbor)
                         node = await self.get_node(neighbor)
-                        if node:
+                        if node and _matches_file(node):
                             results.append({
                                 "entity_id": neighbor,
                                 "entity_type": node.get("entity_type", "UNKNOWN"),

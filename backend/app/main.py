@@ -66,7 +66,7 @@ def _configure_logging() -> None:
     logging.getLogger("chromadb.telemetry.product.posthog").setLevel(logging.CRITICAL)
 
 from app.database.init_db import init_db
-from app.routes import auth, classroom, folder, file, chat
+from app.routes import auth, classroom, folder, file, chat, quiz
 
 
 @asynccontextmanager
@@ -108,6 +108,7 @@ app.include_router(classroom.router)
 app.include_router(folder.router)
 app.include_router(file.router)
 app.include_router(chat.router)
+app.include_router(quiz.router)
 
 
 @app.get("/")

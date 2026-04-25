@@ -392,13 +392,21 @@ class Neo4jGraphStorage(BaseGraphStorage):
         max_hops: int = 2,
         max_results: int = 50,
         exclude_ids: set[str] | None = None,
+        file_filter: str | None = None,
     ) -> list[dict[str, Any]]:
         """Single-query BFS from multiple seed entities using weighted path scoring.
         Score = product(edge_weights) / hop_count, best path per neighbor.
+
+        file_filter: when set, only traverse and return entities whose
+        ``file_path`` property contains this value. Entities can be merged
+        across files, so file_path is stored as a GRAPH_FIELD_SEP-joined
+        list and the filter checks list membership via Cypher
+        ``ANY(fp IN split(file_path, sep) WHERE fp = $file_filter)``.
         """
         if not entity_ids:
             return []
         import time as _time
+        from app.rag.constants import GRAPH_FIELD_SEP
         _t0 = _time.time()
         wl = self._get_workspace_label()
         exclude = list(exclude_ids) if exclude_ids else list(entity_ids)
@@ -410,6 +418,12 @@ class Neo4jGraphStorage(BaseGraphStorage):
             WHERE seed.entity_id IN $seed_ids
               AND neighbor.entity_id IS NOT NULL
               AND NOT neighbor.entity_id IN $exclude_ids
+              AND ($file_filter IS NULL
+                   OR ANY(fp IN split(coalesce(seed.file_path, ""), $sep)
+                          WHERE fp = $file_filter))
+              AND ($file_filter IS NULL
+                   OR ANY(fp IN split(coalesce(neighbor.file_path, ""), $sep)
+                          WHERE fp = $file_filter))
             WITH neighbor,
                  size(r) AS hops,
                  reduce(w = 1.0, rel IN r |
@@ -437,6 +451,8 @@ class Neo4jGraphStorage(BaseGraphStorage):
                 seed_ids=list(entity_ids),
                 exclude_ids=exclude,
                 max_results=max_results,
+                file_filter=file_filter,
+                sep=GRAPH_FIELD_SEP,
             )
             rows: list[dict[str, Any]] = []
             async for record in result:
@@ -451,8 +467,11 @@ class Neo4jGraphStorage(BaseGraphStorage):
                 })
             await result.consume()
         logger.debug(
-            "[%s] get_neighbors_with_scores(%d seeds, hops=%d) → %d neighbors in %.3fs",
-            self.workspace, len(entity_ids), max_hops, len(rows), _time.time() - _t0,
+            "[%s] get_neighbors_with_scores(%d seeds, hops=%d, file_filter=%s) "
+            "→ %d neighbors in %.3fs",
+            self.workspace, len(entity_ids), max_hops,
+            "yes" if file_filter else "no",
+            len(rows), _time.time() - _t0,
         )
         return rows
 
