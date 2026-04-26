@@ -1,0 +1,310 @@
+{
+  "benchmark_info": {
+    "system": "lightrag_naive",
+    "classroom_id": 3,
+    "file_url": "https://d099dd13d3d9c68abd2a13929abba54e.r2.cloudflarestorage.com/classroom-files/folders/3/Chapter #1 Introduction to Psychology.pdf",
+    "timestamp": "2026-04-26T10:22:25.732543+00:00"
+  },
+  "results": [
+    {
+      "id": 1,
+      "question": "What is the modern definition of psychology?",
+      "ground_truth": "Psychology is the scientific study of behavior and mental processes.",
+      "generated_answer": "The modern definition of psychology is \"the scientific study of behavior and mental processes.\" This definition emphasizes the importance of scientific methods, such as experimentation and observation, in understanding psychological phenomena. \n\nHistorically, psychology has evolved from being defined as the science of the soul or mind to its current understanding, which focuses on observable behaviors and mental processes. This shift reflects a broader understanding of psychology as a discipline that encompasses various aspects of human experience, including cognition, affect (emotions), and behavior. \n\nIn summary, psychology today is recognized as a science that systematically investigates the complexities of human behavior and mental processes, moving beyond earlier definitions that were more abstract and less empirically grounded.",
+      "latency_s": 10.135,
+      "output_tokens": 135,
+      "category": "factual",
+      "empty_answer": false
+    },
+    {
+      "id": 2,
+      "question": "What are the three key terms in the modern definition of psychology?",
+      "ground_truth": "The three key terms are science, behavior, and mental processes.",
+      "generated_answer": "The three key terms in the modern definition of psychology are **behavior**, **mental processes**, and **cognition**. \n\nPsychology is defined as the scientific study of behavior and mental processes, which encompasses the aspects of cognition, conation (behavior), and affect. Understanding these elements is essential for predicting and interpreting human actions and emotions.",
+      "latency_s": 4.716,
+      "output_tokens": 68,
+      "category": "factual",
+      "empty_answer": false
+    },
+    {
+      "id": 3,
+      "question": "What does behavior mean in psychology?",
+      "ground_truth": "Behavior refers to observable actions such as laughing, running, crying, speaking, and writing.",
+      "generated_answer": "In psychology, behavior refers to the observable actions and reactions of individuals, which can be influenced by various factors including thoughts, feelings, and environmental stimuli. It is one of the three key aspects of mental processes, alongside cognition and affect. Understanding behavior is essential for predicting how individuals may act in different situations, as it is closely linked to what they are feeling and thinking at any given time.\n\nThe study of behavior encompasses a wide range of activities, from simple actions to complex interactions, and is a fundamental component of psychological research and practice. By observing and analyzing behavior, psychologists aim to gain insights into the underlying mental processes that drive these actions.",
+      "latency_s": 4.609,
+      "output_tokens": 128,
+      "category": "factual",
+      "empty_answer": false
+    },
+    {
+      "id": 4,
+      "question": "What are mental processes in psychology?",
+      "ground_truth": "Mental processes include thoughts, feelings, and motives that cannot be directly observed.",
+      "generated_answer": "In psychology, mental processes refer to the various activities that occur within the mind, which can be categorized into two main types: cognition and affect. \n\n### Cognition\nCognitive mental processes encompass a range of functions including perception, beliefs, thoughts, and ideas. These processes involve activities such as perceiving, thinking, understanding, and remembering. Essentially, cognition is about how we process information and make sense of the world around us.\n\n### Affect\nOn the other hand, affect pertains to mental processes that involve one's feelings, mood, or emotional state. This aspect of mental processes focuses on how emotions influence our thoughts and behaviors.\n\n### Comprehensive View\nAdditionally, mental processes can be further understood through the three aspects of psychology: cognition, conation (behavior), and affect. To fully comprehend an individual's behavior or predict their actions, it is crucial to understand their emotional state, which is tied to both cognitive and affective processes.\n\nOverall, mental processes are central to the study of psychology, as they encompass the intricate workings of the mind that influence behavior and emotional responses.",
+      "latency_s": 7.175,
+      "output_tokens": 218,
+      "category": "factual",
+      "empty_answer": false
+    },
+    {
+      "id": 5,
+      "question": "What are the four main goals of psychology?",
+      "ground_truth": "The four main goals of psychology are describe, explain, predict, and control behavior.",
+      "generated_answer": "The provided context does not specify the four main goals of psychology. Therefore, I don't have enough information to answer your question. If you have access to additional materials or specific resources, I recommend checking those for a detailed explanation of the goals of psychology.",
+      "latency_s": 3.771,
+      "output_tokens": 51,
+      "category": "factual",
+      "empty_answer": false
+    },
+    {
+      "id": 6,
+      "question": "What does the goal 'Describe' mean in psychology?",
+      "ground_truth": "Describe means collecting data and observing behavior under specific conditions.",
+      "generated_answer": "I don't have enough information to answer your question about the goal 'Describe' in psychology. The provided context does not include specific details regarding this goal. If you have any other questions or need information on a different topic, feel free to ask!",
+      "latency_s": 3.524,
+      "output_tokens": 50,
+      "category": "factual",
+      "empty_answer": false
+    },
+    {
+      "id": 7,
+      "question": "What does the goal 'Explain' mean in psychology?",
+      "ground_truth": "Explain involves identifying causes, principles, and relationships behind behavior.",
+      "generated_answer": "I don't have enough information to provide a specific definition or explanation of the goal 'Explain' in psychology based on the provided context. The context primarily discusses the definitions, history, and aspects of psychology but does not detail specific goals such as 'Explain.' If you have any other questions or need information on a different topic, feel free to ask!",
+      "latency_s": 4.547,
+      "output_tokens": 72,
+      "category": "factual",
+      "empty_answer": false
+    },
+    {
+      "id": 8,
+      "question": "What does the goal 'Predict' mean in psychology?",
+      "ground_truth": "Predict means forecasting future behavior based on measurements and observations.",
+      "generated_answer": "The goal of \"Predict\" in psychology refers to the ability to anticipate an individual's future behavior or mental state based on an understanding of their current feelings, thoughts, and behaviors. To effectively predict what someone will do next, psychologists must analyze the three aspects of mental processes: cognition, conation (behavior), and affect. \n\nUnderstanding these components allows psychologists to form hypotheses about how a person might react in various situations. For instance, if a person is feeling anxious (affect), it may predict that they will avoid social situations (behavior) or have negative thoughts (cognition). Thus, prediction in psychology is fundamentally about using knowledge of mental processes to foresee actions and reactions in individuals.",
+      "latency_s": 5.659,
+      "output_tokens": 138,
+      "category": "factual",
+      "empty_answer": false
+    },
+    {
+      "id": 9,
+      "question": "What does the goal 'Control' mean in psychology?",
+      "ground_truth": "Control means modifying behavior to improve individual and societal outcomes.",
+      "generated_answer": "I don't have enough information regarding the specific goal 'Control' in psychology based on the provided context. The context primarily discusses the definition, scope, and historical perspectives of psychology, but does not elaborate on specific goals such as 'Control'. If you have more specific details or another context, I would be happy to help!",
+      "latency_s": 4.205,
+      "output_tokens": 65,
+      "category": "factual",
+      "empty_answer": false
+    },
+    {
+      "id": 10,
+      "question": "What is an additional goal of psychology?",
+      "ground_truth": "An additional goal of psychology is to improve the quality of human life.",
+      "generated_answer": "I don't have enough information to provide an answer regarding additional goals of psychology. The provided context does not specify any goals beyond the general definition and scope of psychology.",
+      "latency_s": 5.396,
+      "output_tokens": 33,
+      "category": "factual",
+      "empty_answer": false
+    },
+    {
+      "id": 11,
+      "question": "What was the earliest definition of psychology?",
+      "ground_truth": "Psychology was first defined as the science of soul.",
+      "generated_answer": "The earliest definition of psychology was as the \"science of soul.\" This concept was prevalent in earlier eras, where psychology was associated with the study of the soul, mind, and consciousness. The term \"psychology\" itself comes from Greek roots, meaning \"the study of soul or spirit,\" with \"psych\" referring to self, soul, or mind, and \"logus\" standing for knowledge. \n\nThis definition, however, faced criticism because it could not fulfill the scientific criteria of experimentation and observation, which are essential in the field of science. Consequently, the definition of psychology as the science of soul was eventually rejected in favor of more empirical approaches that focus on observable behavior and mental processes.",
+      "latency_s": 7.587,
+      "output_tokens": 140,
+      "category": "factual",
+      "empty_answer": false
+    },
+    {
+      "id": 12,
+      "question": "Why was psychology as the science of soul rejected?",
+      "ground_truth": "It was rejected because the soul cannot be observed, measured, or scientifically tested.",
+      "generated_answer": "Psychology was defined as the \"science of soul,\" but this definition was ultimately rejected for several reasons. \n\nFirstly, the concept of the soul is non-scientific, non-observable, and non-objective. Science relies on observation and experimentation to validate its claims, and the soul does not lend itself to such scrutiny. Since the soul cannot be observed or experimented upon, it fails to meet the criteria necessary for a scientific discipline. This lack of empirical evidence led to the rejection of the definition of psychology as the science of soul.\n\nAdditionally, the term \"soul\" is often associated with religious theories regarding immortality and the relationship to God. While psychologists do not oppose religion, they aim to keep the field of psychology free from religious influences and vague terminology. This desire for a clear, objective framework further contributed to the rejection of the soul-centric definition of psychology.\n\nIn summary, the rejection of psychology as the science of soul stems from its non-scientific nature, the inability to observe or experiment on the soul, and the need to maintain a clear distinction between psychological science and religious concepts.",
+      "latency_s": 6.637,
+      "output_tokens": 222,
+      "category": "reasoning",
+      "empty_answer": false
+    },
+    {
+      "id": 13,
+      "question": "Who wrote the book 'De Anima'?",
+      "ground_truth": "Aristotle wrote the book 'De Anima'.",
+      "generated_answer": "The book 'De Anima' was written by Aristotle. It is considered the first book on psychology, and Aristotle is regarded as the first psychologist. In this work, he referred to the soul as the living principle in all animate beings, emphasizing its importance as the basic principle of life.",
+      "latency_s": 3.712,
+      "output_tokens": 58,
+      "category": "factual",
+      "empty_answer": false
+    },
+    {
+      "id": 14,
+      "question": "What is psychology as the science of mind?",
+      "ground_truth": "Psychology as the science of mind studies mental processes such as thoughts, feelings, and sensations.",
+      "generated_answer": "Psychology, as defined in the context of the science of mind, is rooted in the historical perspectives of Greek philosophers who initially conceptualized it as a science of feelings, sentiments, sensations, and both conscious and unconscious functions. This definition emphasizes the mental processes that govern human behavior and experiences.\n\nIn the 19th century, psychology began to emerge as a distinct discipline, evolving into what is now recognized as the scientific study of behavior and mental processes. Wilhelm Wundt, a key figure in this evolution, established the first psychology laboratory and introduced structuralism, which aimed to study the mental processes systematically. Wundt and his student Edward Titchener focused on understanding the workings of the mind, which they viewed as a complete unit rather than a collection of separate faculties like memory or imagination.\n\nThe modern understanding of psychology encompasses three primary aspects of mental processes: cognition (thought processes), conation (behavior), and affect (emotions). This tripartite framework is essential for understanding individuals' feelings and predicting their behaviors. Overall, psychology as the science of mind seeks to explore and explain the complexities of human thought and behavior through observation and experimentation.",
+      "latency_s": 6.179,
+      "output_tokens": 230,
+      "category": "factual",
+      "empty_answer": false
+    },
+    {
+      "id": 15,
+      "question": "What are the three aspects of mental processes?",
+      "ground_truth": "The three aspects are cognition, affect, and conation.",
+      "generated_answer": "The three aspects of mental processes are **Cognition**, **Conation (behavior)**, and **Affect**. These aspects are fundamental to the subject matter of psychology, which is defined as the science of Affect, Behavior, and Cognition (A, B, C). Understanding these aspects is essential for comprehending someone's feelings and predicting their actions. \n\n- **Cognition** includes mental activities such as perception, beliefs, thoughts, and ideas. It encompasses processes like thinking, understanding, and remembering.\n- **Conation** refers to behavior, which is the observable actions of individuals.\n- **Affect** involves one's feelings, mood, or emotional state, highlighting the emotional dimension of mental processes. \n\nTogether, these aspects provide a comprehensive framework for studying and understanding human psychology.",
+      "latency_s": 6.637,
+      "output_tokens": 161,
+      "category": "factual",
+      "empty_answer": false
+    },
+    {
+      "id": 16,
+      "question": "Who defined psychology as the science of consciousness?",
+      "ground_truth": "John Dewey and William James defined psychology as the science of consciousness.",
+      "generated_answer": "The context provided does not specify an individual who defined psychology explicitly as the \"science of consciousness.\" However, it does mention that in the 19th century, psychology was emerging as a separate discipline and was defined as the science of \"mental processes.\" Additionally, it notes that when Wundt established the first laboratory and evolved structuralism, he defined psychology as the science of mind, which encompasses aspects of consciousness.\n\nIf you are looking for a specific definition of psychology as the science of consciousness, I don't have enough information to provide that.",
+      "latency_s": 4.879,
+      "output_tokens": 109,
+      "category": "factual",
+      "empty_answer": false
+    },
+    {
+      "id": 17,
+      "question": "What is stream of consciousness?",
+      "ground_truth": "Stream of consciousness is the continuous flow of thoughts and experiences.",
+      "generated_answer": "The concept of \"stream of consciousness\" refers to the continuous flow of mental processes. It suggests that the mind operates like a constantly flowing stream, where thoughts, feelings, and perceptions are interconnected across past, present, and future experiences. This idea emphasizes that while we may analyze different aspects of the mind separately for study purposes, the mind itself functions as a complete unit, integrating various mental processes seamlessly.\n\nIn psychology, this concept highlights the dynamic nature of consciousness, where mental activities are not isolated but rather part of an ongoing, holistic experience. The stream of consciousness reflects how individuals experience their thoughts and emotions in a fluid and interconnected manner, rather than as discrete, separate events.",
+      "latency_s": 5.459,
+      "output_tokens": 135,
+      "category": "factual",
+      "empty_answer": false
+    },
+    {
+      "id": 18,
+      "question": "Who defined psychology as the science of behavior?",
+      "ground_truth": "J. B. Watson defined psychology as the science of behavior.",
+      "generated_answer": "The context provided does not specify who defined psychology as the science of behavior. It states that psychology is now defined as the scientific study of behavior and mental processes, but it does not attribute this definition to a specific individual. Therefore, I don't have enough information to answer your question.",
+      "latency_s": 5.051,
+      "output_tokens": 57,
+      "category": "factual",
+      "empty_answer": false
+    },
+    {
+      "id": 19,
+      "question": "What is the stimulus-response theory?",
+      "ground_truth": "Stimulus-response theory explains behavior as a reaction to environmental stimuli.",
+      "generated_answer": "I don't have enough information about the stimulus-response theory in the provided context. The context mainly discusses the definition and evolution of psychology, its historical perspectives, and the contributions of early psychologists like Wundt and Aristotle. If you have any other questions related to the content provided, feel free to ask!",
+      "latency_s": 8.277,
+      "output_tokens": 61,
+      "category": "factual",
+      "empty_answer": false
+    },
+    {
+      "id": 20,
+      "question": "What is the comprehensive modern definition of psychology?",
+      "ground_truth": "Psychology is the systematic and scientific study of behavior and mental processes.",
+      "generated_answer": "The modern definition of psychology is described as \"the scientific study of behavior and mental processes.\" This definition emphasizes the importance of scientific methods, such as experimentation and observation, in understanding psychological phenomena.\n\nHistorically, psychology has evolved from being defined as the \"science of soul\" to focusing on mental processes and behaviors. In the 19th century, psychology began to emerge as a separate discipline, with early definitions centering around mental processes. However, the contemporary view recognizes the need for observable and measurable aspects of behavior and mental functions, which aligns with the scientific approach.\n\nIn summary, psychology today is understood as a science that investigates the complexities of human behavior and mental processes, incorporating various perspectives and methodologies to explore how individuals think, feel, and act.",
+      "latency_s": 5.406,
+      "output_tokens": 151,
+      "category": "factual",
+      "empty_answer": false
+    },
+    {
+      "id": 21,
+      "question": "How does psychology help improve study habits?",
+      "ground_truth": "Psychology helps improve study habits by applying behavioral and cognitive strategies.",
+      "generated_answer": "I don't have enough information on how psychology specifically helps improve study habits. The provided context primarily discusses the definitions, history, and scope of psychology rather than its applications in enhancing study habits. If you have any other questions related to the context, feel free to ask!",
+      "latency_s": 4.661,
+      "output_tokens": 54,
+      "category": "application",
+      "empty_answer": false
+    },
+    {
+      "id": 22,
+      "question": "How does psychology help manage stress?",
+      "ground_truth": "Psychology teaches coping strategies to manage stress and anxiety.",
+      "generated_answer": "I don't have enough information on how psychology specifically helps manage stress. The provided context focuses on the definitions, history, and aspects of psychology rather than its applications in stress management. If you have any other questions or need information on a different topic, feel free to ask!",
+      "latency_s": 5.975,
+      "output_tokens": 55,
+      "category": "application",
+      "empty_answer": false
+    },
+    {
+      "id": 23,
+      "question": "How do psychologists modify behavior?",
+      "ground_truth": "Psychologists modify behavior using prediction and behavioral interventions.",
+      "generated_answer": "I don't have enough information on how psychologists modify behavior based on the provided context. The context primarily discusses the definitions and historical perspectives of psychology, rather than specific methods or techniques used by psychologists to modify behavior. If you have more specific questions or need information on a different topic, feel free to ask!",
+      "latency_s": 4.221,
+      "output_tokens": 61,
+      "category": "application",
+      "empty_answer": false
+    },
+    {
+      "id": 24,
+      "question": "What is the role of industrial psychologists?",
+      "ground_truth": "Industrial psychologists modify employee behavior to improve productivity.",
+      "generated_answer": "I don't have enough information on the specific role of industrial psychologists in the provided context. The context primarily discusses the definition, goals, and historical perspectives of psychology, but does not cover the specific functions or responsibilities of industrial psychologists.",
+      "latency_s": 4.071,
+      "output_tokens": 46,
+      "category": "factual",
+      "empty_answer": false
+    },
+    {
+      "id": 25,
+      "question": "How does psychology help marriage counseling?",
+      "ground_truth": "Marriage counselors modify behavior to improve relationships between partners.",
+      "generated_answer": "I don't have enough information to answer that question.",
+      "latency_s": 3.475,
+      "output_tokens": 11,
+      "category": "application",
+      "empty_answer": false
+    },
+    {
+      "id": 26,
+      "question": "How does psychology help improve memory?",
+      "ground_truth": "Psychology provides strategies to expand memory span.",
+      "generated_answer": "I don't have enough information on how psychology specifically helps improve memory. The provided context primarily discusses the definitions and historical perspectives of psychology, as well as its focus on mental processes, but does not detail methods or techniques for improving memory. If you have any other questions related to the context, feel free to ask!",
+      "latency_s": 4.236,
+      "output_tokens": 63,
+      "category": "application",
+      "empty_answer": false
+    },
+    {
+      "id": 27,
+      "question": "How does psychology help problem solving?",
+      "ground_truth": "Psychology provides methods to effectively solve problems.",
+      "generated_answer": "I don't have enough information on how psychology specifically helps with problem solving. The provided context focuses on the definitions, goals, and areas of psychology, but it does not detail its applications in problem-solving scenarios. If you have more specific aspects of psychology in mind or other questions, feel free to ask!",
+      "latency_s": 4.33,
+      "output_tokens": 61,
+      "category": "application",
+      "empty_answer": false
+    },
+    {
+      "id": 28,
+      "question": "How does psychology help improve self-esteem?",
+      "ground_truth": "Psychology helps enhance self-esteem through behavioral and cognitive techniques.",
+      "generated_answer": "I don't have enough information on how psychology specifically helps improve self-esteem. The provided context focuses on the definitions and historical perspectives of psychology rather than its applications in enhancing self-esteem. If you have any other questions or need information on a different topic, feel free to ask!",
+      "latency_s": 3.667,
+      "output_tokens": 55,
+      "category": "application",
+      "empty_answer": false
+    },
+    {
+      "id": 29,
+      "question": "How does psychology help control anger?",
+      "ground_truth": "Psychology teaches strategies to control anger and emotional responses.",
+      "generated_answer": "I don't have enough information to answer that question. The provided context does not discuss how psychology helps control anger specifically.",
+      "latency_s": 3.945,
+      "output_tokens": 24,
+      "category": "application",
+      "empty_answer": false
+    },
+    {
+      "id": 30,
+      "question": "How does psychology help control poor study habits?",
+      "ground_truth": "Psychology applies behavioral techniques to change poor study habits.",
+      "generated_answer": "I don't have enough information to answer that question. The provided context does not include specific details on how psychology can help control poor study habits. If you have any other questions or need information on a different topic, feel free to ask!",
+      "latency_s": 3.569,
+      "output_tokens": 48,
+      "category": "application",
+      "empty_answer": false
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "system": "lightrag",
+  "n_questions": 30,
+  "rouge_l": 0.1192,
+  "bertscore_f1": 0.7464,
+  "semantic_sim": 0.5762,
+  "avg_latency_s": 13.608,
+  "avg_output_tokens": 87,
+  "total_output_tokens": 2610,
+  "total_input_tokens_estimated": 26100,
+  "total_cost_usd_estimated": 0.1696,
+  "cost_note": "Input tokens estimated as 10\u00d7 output. GPT-4o pricing: $5/1M input, $15/1M output.",
+  "by_category": {
+    "factual": {
+      "n": 20,
+      "rouge_l": 0.1206,
+      "bertscore_f1": 0.7481,
+      "semantic_sim": 0.6187,
+      "avg_latency_s": 14.897,
+      "avg_output_tokens": 101
+    },
+    "reasoning": {
+      "n": 1,
+      "rouge_l": 0.0735,
+      "bertscore_f1": 0.7528,
+      "semantic_sim": 0.5853,
+      "avg_latency_s": 18.015,
+      "avg_output_tokens": 310
+    },
+    "application": {
+      "n": 9,
+      "rouge_l": 0.1211,
+      "bertscore_f1": 0.7419,
+      "semantic_sim": 0.4807,
+      "avg_latency_s": 10.253,
+      "avg_output_tokens": 32
+    }
+  }
+}

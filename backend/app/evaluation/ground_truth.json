@@ -1,0 +1,339 @@
+{
+  "metadata": {
+    "classroom_id": 4,
+    "file_id": 5,
+    "document_name": "3-IntroductionToVirtualization.pptx"
+  },
+  "questions": [
+    {
+      "id": 1,
+      "question": "What is virtualization in computing?",
+      "ground_truth": "Virtualization is the creation of a virtual version of resources such as hardware, operating systems, storage, or networks.",
+      "relevant_page": 3,
+      "topic_id": 1,
+      "category": "factual"
+    },
+    {
+      "id": 2,
+      "question": "What problem does virtualization solve in traditional systems?",
+      "ground_truth": "It solves the problem of tight coupling between hardware and operating systems.",
+      "relevant_page": 3,
+      "topic_id": 1,
+      "category": "reasoning"
+    },
+    {
+      "id": 3,
+      "question": "What is a virtual machine?",
+      "ground_truth": "A virtual machine is a software-based computer that runs an operating system and applications like a physical computer.",
+      "relevant_page": 4,
+      "topic_id": 1,
+      "category": "factual"
+    },
+    {
+      "id": 4,
+      "question": "What components does a virtual machine contain?",
+      "ground_truth": "It contains virtual CPU, memory, storage, and network interface.",
+      "relevant_page": 4,
+      "topic_id": 1,
+      "category": "factual"
+    },
+    {
+      "id": 5,
+      "question": "How does virtualization improve hardware utilization?",
+      "ground_truth": "It allows multiple operating systems and applications to run on the same hardware simultaneously.",
+      "relevant_page": 4,
+      "topic_id": 1,
+      "category": "reasoning"
+    },
+
+    {
+      "id": 6,
+      "question": "What is a host machine?",
+      "ground_truth": "The host machine is the physical system on which virtual machines are created.",
+      "relevant_page": 5,
+      "topic_id": 2,
+      "category": "factual"
+    },
+    {
+      "id": 7,
+      "question": "What is a guest machine?",
+      "ground_truth": "A guest machine is a virtual machine running on a host system.",
+      "relevant_page": 5,
+      "topic_id": 2,
+      "category": "factual"
+    },
+    {
+      "id": 8,
+      "question": "What is hardware independence in virtual machines?",
+      "ground_truth": "Hardware independence means a virtual machine sees consistent hardware regardless of the underlying physical system.",
+      "relevant_page": 7,
+      "topic_id": 2,
+      "category": "factual"
+    },
+    {
+      "id": 9,
+      "question": "What is isolation in virtualization?",
+      "ground_truth": "Isolation ensures that each virtual machine operates independently without affecting others.",
+      "relevant_page": 7,
+      "topic_id": 2,
+      "category": "factual"
+    },
+    {
+      "id": 10,
+      "question": "What is encapsulation in virtualization?",
+      "ground_truth": "Encapsulation means the entire virtual machine is stored as a single file.",
+      "relevant_page": 7,
+      "topic_id": 2,
+      "category": "factual"
+    },
+
+    {
+      "id": 11,
+      "question": "What is a hypervisor?",
+      "ground_truth": "A hypervisor is a software layer that allows multiple operating systems to share the same physical hardware.",
+      "relevant_page": 8,
+      "topic_id": 3,
+      "category": "factual"
+    },
+    {
+      "id": 12,
+      "question": "What is another name for a hypervisor?",
+      "ground_truth": "A hypervisor is also known as a virtual machine monitor (VMM).",
+      "relevant_page": 8,
+      "topic_id": 3,
+      "category": "factual"
+    },
+    {
+      "id": 13,
+      "question": "How does a hypervisor ensure isolation?",
+      "ground_truth": "It allocates separate computing resources like CPU, memory, and storage to each virtual machine.",
+      "relevant_page": 8,
+      "topic_id": 3,
+      "category": "reasoning"
+    },
+
+    {
+      "id": 14,
+      "question": "What are the main benefits of virtualization?",
+      "ground_truth": "Benefits include resource efficiency, cost reduction, scalability, high availability, and improved security.",
+      "relevant_page": 9,
+      "topic_id": 4,
+      "category": "factual"
+    },
+    {
+      "id": 15,
+      "question": "How does virtualization reduce IT costs?",
+      "ground_truth": "It reduces the need for physical hardware and improves resource utilization.",
+      "relevant_page": 9,
+      "topic_id": 4,
+      "category": "reasoning"
+    },
+    {
+      "id": 16,
+      "question": "How does virtualization support disaster recovery?",
+      "ground_truth": "It enables replication and quick restoration of virtual machines.",
+      "relevant_page": 9,
+      "topic_id": 4,
+      "category": "application"
+    },
+
+    {
+      "id": 17,
+      "question": "What are the main types of virtualization?",
+      "ground_truth": "Types include application, network, desktop, storage, server, and data virtualization.",
+      "relevant_page": 11,
+      "topic_id": 5,
+      "category": "factual"
+    },
+    {
+      "id": 18,
+      "question": "What is application virtualization?",
+      "ground_truth": "Application virtualization allows applications to run remotely from a server while appearing local to the user.",
+      "relevant_page": 12,
+      "topic_id": 5,
+      "category": "factual"
+    },
+    {
+      "id": 19,
+      "question": "What is network virtualization?",
+      "ground_truth": "Network virtualization creates multiple logical networks on top of a single physical network.",
+      "relevant_page": 13,
+      "topic_id": 5,
+      "category": "factual"
+    },
+    {
+      "id": 20,
+      "question": "What is desktop virtualization?",
+      "ground_truth": "Desktop virtualization allows users to access their desktop environment remotely from any device.",
+      "relevant_page": 14,
+      "topic_id": 5,
+      "category": "factual"
+    },
+
+    {
+      "id": 21,
+      "question": "What is storage virtualization?",
+      "ground_truth": "Storage virtualization combines multiple storage devices into a single logical storage system.",
+      "relevant_page": 15,
+      "topic_id": 6,
+      "category": "factual"
+    },
+    {
+      "id": 22,
+      "question": "What is server virtualization?",
+      "ground_truth": "Server virtualization divides a physical server into multiple isolated virtual servers.",
+      "relevant_page": 16,
+      "topic_id": 6,
+      "category": "factual"
+    },
+    {
+      "id": 23,
+      "question": "What is data virtualization?",
+      "ground_truth": "Data virtualization integrates data from multiple sources into a unified logical view.",
+      "relevant_page": 17,
+      "topic_id": 6,
+      "category": "factual"
+    },
+
+    {
+      "id": 24,
+      "question": "What are the three main components of modern virtualization?",
+      "ground_truth": "They are virtual compute, virtual storage, and virtual networking.",
+      "relevant_page": 18,
+      "topic_id": 7,
+      "category": "factual"
+    },
+    {
+      "id": 25,
+      "question": "What is virtual compute?",
+      "ground_truth": "Virtual compute refers to virtual CPUs created by the hypervisor for virtual machines.",
+      "relevant_page": 18,
+      "topic_id": 7,
+      "category": "factual"
+    },
+    {
+      "id": 26,
+      "question": "How does virtualization improve CPU utilization?",
+      "ground_truth": "It allows multiple virtual CPUs to share physical CPUs, reducing idle time.",
+      "relevant_page": 19,
+      "topic_id": 7,
+      "category": "reasoning"
+    },
+    {
+      "id": 27,
+      "question": "What is virtual networking?",
+      "ground_truth": "Virtual networking abstracts physical network resources and provides virtual network devices to virtual machines.",
+      "relevant_page": 21,
+      "topic_id": 7,
+      "category": "factual"
+    },
+
+    {
+      "id": 28,
+      "question": "What are the five levels of virtualization implementation?",
+      "ground_truth": "The five levels are ISA, hardware abstraction layer, operating system, library, and application level.",
+      "relevant_page": 22,
+      "topic_id": 8,
+      "category": "factual"
+    },
+    {
+      "id": 29,
+      "question": "What is ISA-level virtualization?",
+      "ground_truth": "ISA-level virtualization uses emulation to run software designed for different hardware architectures.",
+      "relevant_page": 23,
+      "topic_id": 8,
+      "category": "factual"
+    },
+    {
+      "id": 30,
+      "question": "What is operating system level virtualization?",
+      "ground_truth": "It creates isolated environments within a single operating system for multiple users and applications.",
+      "relevant_page": 25,
+      "topic_id": 8,
+      "category": "factual"
+    },
+
+    {
+      "id": 31,
+      "question": "What is full virtualization?",
+      "ground_truth": "Full virtualization provides complete hardware emulation without modifying the guest operating system.",
+      "relevant_page": 29,
+      "topic_id": 9,
+      "category": "factual"
+    },
+    {
+      "id": 32,
+      "question": "What is para-virtualization?",
+      "ground_truth": "Para-virtualization modifies the guest operating system to communicate directly with the hypervisor.",
+      "relevant_page": 29,
+      "topic_id": 9,
+      "category": "factual"
+    },
+    {
+      "id": 33,
+      "question": "What is host-based virtualization?",
+      "ground_truth": "Host-based virtualization runs virtual machines as applications on top of a host operating system.",
+      "relevant_page": 29,
+      "topic_id": 9,
+      "category": "factual"
+    },
+
+    {
+      "id": 34,
+      "question": "What is a Type-1 hypervisor?",
+      "ground_truth": "A Type-1 hypervisor runs directly on physical hardware without a host operating system.",
+      "relevant_page": 30,
+      "topic_id": 10,
+      "category": "factual"
+    },
+    {
+      "id": 35,
+      "question": "What is a Type-2 hypervisor?",
+      "ground_truth": "A Type-2 hypervisor runs on top of a host operating system as an application.",
+      "relevant_page": 30,
+      "topic_id": 10,
+      "category": "factual"
+    },
+
+    {
+      "id": 36,
+      "question": "How does virtualization help in server consolidation?",
+      "ground_truth": "It allows multiple virtual servers to run on a single physical server, reducing hardware usage.",
+      "relevant_page": 38,
+      "topic_id": 11,
+      "category": "application"
+    },
+    {
+      "id": 37,
+      "question": "How does virtualization improve business continuity?",
+      "ground_truth": "It enables quick recovery by replicating and restoring virtual machine images.",
+      "relevant_page": 38,
+      "topic_id": 11,
+      "category": "application"
+    },
+    {
+      "id": 38,
+      "question": "How does virtualization support testing and development?",
+      "ground_truth": "It allows rapid creation and reconfiguration of virtual environments for testing.",
+      "relevant_page": 38,
+      "topic_id": 11,
+      "category": "application"
+    },
+    {
+      "id": 39,
+      "question": "What is legacy application re-hosting in virtualization?",
+      "ground_truth": "It is the process of running old applications on modern hardware using virtual machines.",
+      "relevant_page": 38,
+      "topic_id": 11,
+      "category": "application"
+    },
+    {
+      "id": 40,
+      "question": "What are the top economic benefits of virtualization?",
+      "ground_truth": "They include reduced infrastructure cost, lower operating cost, and minimized downtime losses.",
+      "relevant_page": 39,
+      "topic_id": 11,
+      "category": "factual"
+    }
+  ]
+}

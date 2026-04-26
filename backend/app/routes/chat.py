@@ -84,7 +84,12 @@ async def ask_question(
 
     try:
         engine = await classroom_rag_service.get_engine(classroom.id)
-        param = QueryParam(mode="mix", conversation_history=history, top_k=40, chunk_top_k=20)
+        param = QueryParam(
+            mode="naive",
+            chunk_top_k=20,
+            conversation_history=history,
+            file_filter=file.file_url,
+        )
         query_result = await engine.aquery(request.question, param)
         answer = query_result.content or ""
         logger.info(f"[chat] ANSWER file_id={file_id} a_len={len(answer)}")

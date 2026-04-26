@@ -57,6 +57,24 @@ Note: `app.database.init_db.init_db()` also calls `Base.metadata.create_all()` o
 ```
 `scripts/monitor_session.py` and `scripts/watch_kg.py` give live KG + Postgres telemetry during ingestion; `scripts/backend_log_tail.py` greps the backend log for errors in real time.
 
+### RAG benchmarking
+```bash
+cd backend
+
+# Step 1 — ask all questions in ground_truth.json through the live chat path (naive mode)
+.venv\Scripts\python.exe app/evaluation/run_benchmark_lightrag.py `
+    --classroom-id <id> --file-url "<r2_url>" [--resume]
+
+# Step 2 — compute ROUGE-L F1 / BERTScore F1 / Semantic Similarity / latency / cost
+.venv\Scripts\python.exe app/evaluation/compute_metrics.py `
+    --input app/evaluation/results/lightrag_raw.json --system naive
+
+# Step 3 — side-by-side comparison vs old LangChain system
+.venv\Scripts\python.exe app/evaluation/compare.py `
+    --new app/evaluation/results/naive_metrics.json --old <old_metrics.json>
+```
+Ground truth lives in `backend/app/evaluation/ground_truth.json`. The benchmark uses the same `QueryParam(mode="naive", file_filter=..., chunk_top_k=20)` shape as `routes/chat.py`, so its numbers reflect production chat behavior. `preflight.py` verifies Postgres / Neo4j / Chroma / OpenAI reachability and that the file is `COMPLETED` before burning tokens. Results save incrementally to `app/evaluation/results/` — `--resume` skips already-completed questions if a run is interrupted.
+
 ### Tests
 ```bash
 cd backend
@@ -89,7 +107,7 @@ cd frontend && npx tsc --noEmit      # type check (no `type-check` script define
 
 1. **Upload** (`POST /files/upload/{folder_id}`, `routes/file.py`) — access-checks classroom membership, pushes bytes to Cloudflare R2, creates a `File` row with `PENDING`, schedules `file_processor.process_file` as a FastAPI `BackgroundTask`.
 2. **Process** (`services/file_processor.py`) — sets `PROCESSING`, resolves the classroom's `LightRAGEngine` via `classroom_rag_service.get_engine(classroom_id)`, runs `MultimodalPipeline.process_document(...)` with a 600s timeout, generates a 2-3 sentence LLM summary into `File.description`, sets `COMPLETED` (or `FAILED` on error/timeout).
-3. **Ask** (`POST /chat/files/{file_id}/ask`, `routes/chat.py`) — loads last 10 chat turns, resolves the classroom engine, calls `engine.aquery(question, QueryParam(mode="mix", ...))`, persists both the user message and assistant reply into `chat_messages`, returns answer + source file paths.
+3. **Ask** (`POST /chat/files/{file_id}/ask`, `routes/chat.py`) — loads last 10 chat turns, resolves the classroom engine, calls `engine.aquery(question, QueryParam(mode="naive", chunk_top_k=20, file_filter=file.file_url, ...))`, persists both the user message and assistant reply into `chat_messages`, returns answer + source file paths. Chat is scoped to a single file via `file_filter` and uses pure ChromaDB vector search on the `chunks` collection — **no Neo4j hop at query time**. The KG is preserved for quiz generation and future mind-map features (which still use `mode="mix"` internally).
 
 The `_get_file_and_classroom()` helper in `routes/chat.py` is the canonical access-control pattern: every file-scoped route resolves file → folder → classroom and checks `current_user in classroom.members`.
 
@@ -98,7 +116,7 @@ The `_get_file_and_classroom()` helper in `routes/chat.py` is the canonical acce
 This is a from-scratch port/implementation of LightRAG's graph-based RAG, not an imported library. The key abstraction is **workspace isolation**: each classroom gets `workspace="classroom_{id}"` and that string is part of every storage key (Postgres row, Chroma collection, Neo4j label). Engines never cross classrooms.
 
 - `engine.py` — `LightRAGEngine` dataclass owns all storage objects and exposes `ainsert`, `aquery`, `adelete_file`, `finalize`. Created per-classroom, cached in `services/classroom_rag.py` as a module-level singleton `ClassroomRAGService`, initialized lazily on first access with a double-checked `asyncio.Lock`.
-- `base.py` — abstract storage interfaces (`BaseKVStorage`, `BaseVectorStorage`, `BaseGraphStorage`, `DocStatusStorage`) and `QueryParam` (supports modes: `local`, `global`, `hybrid`, `naive`, `mix`, `bypass`; the app always uses `mix`). `QueryParam` also has `traversal_hops=2` and `max_graph_neighbors=30` for multi-hop BFS control.
+- `base.py` — abstract storage interfaces (`BaseKVStorage`, `BaseVectorStorage`, `BaseGraphStorage`, `DocStatusStorage`) and `QueryParam` (supports modes: `local`, `global`, `hybrid`, `naive`, `mix`, `bypass`). **Mode policy**: chat (`routes/chat.py`) uses `naive`; quiz generation and other KG-dependent callers use `mix`. `QueryParam` also has `traversal_hops=2` and `max_graph_neighbors=30` for multi-hop BFS control (mix mode only — naive ignores them). `file_filter` scopes retrieval to a single document (used by chat and quiz).
 - `namespace.py` — string constants identifying which logical store a namespace belongs to (7 KV namespaces, 3 vector namespaces, 1 graph, 1 doc-status).
 - `operate.py` — pure functions: `chunking_by_token_size`, `extract_entities`, `merge_nodes_and_edges`, `kg_query`, `naive_query`. `kg_query` uses **multi-hop graph traversal**: after ChromaDB finds seed entities by vector similarity, `_expand_graph_neighbors()` calls `get_neighbors_with_scores()` BFS on Neo4j to discover related entities up to `traversal_hops` hops away, scoring by product(edge_weights)/hop_count. Chunk IDs for both seeds and neighbors are pulled from the `entity_chunks` KV namespace (complete list) rather than the node's `source_id` field (truncated at 50). `DEFAULT_CHUNK_TOKEN_SIZE = 800` (not 1200).
 - `storage/` — concrete backends:
@@ -153,3 +171,4 @@ Backend CI spins up Postgres 16 + Neo4j 5.18 as services, runs `alembic upgrade 
   Symptom to recognize: `ImportError: DLL load failed while importing <module>: A dynamic link library (DLL) initialization routine failed.` with `SmartAppControlState: On` in `Get-MpComputerStatus`.
 - **ChromaDB telemetry noise**: chromadb 0.4.24 × posthog 7.x have an ABI mismatch (`capture() takes 1 positional argument but 3 were given`). `Settings(anonymized_telemetry=False)` silences post-init events, and `_configure_logging()` in `app/main.py` sets `chromadb.telemetry.product.posthog` to CRITICAL to suppress the one constructor-time `ClientStartEvent` that fires before Settings is read.
 - **Async SQLAlchemy — always eager-load relationships**: `db.get(Model, id)` never loads ORM relationships. Accessing a relationship attribute afterward (e.g. `quiz.attempt`) inside an async session triggers a synchronous lazy-load and crashes with `MissingGreenlet`. **Rule**: any route that reads a relationship must use `select(Model).options(selectinload(Model.rel)).where(...)` at query time. `db.get()` is only safe when you need the row itself and will not touch any relationship attribute.
+- **Stale `"mode": "mix"` strings in `routes/chat.py`**: the live ask endpoint uses `mode="naive"`, but the `chat_messages.metadata` JSON written at line 106 still records `"mode": "mix"`, and the `/chat/files/{id}/stats` response at line 173 still reports `"retrieval_mode": "mix"`. These are cosmetic labels not used for routing — left intentionally untouched during the mix→naive switch to keep the change set minimal. Update them in a separate small commit if the values matter for downstream analytics.
