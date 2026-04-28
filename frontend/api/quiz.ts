@@ -77,7 +77,7 @@ export async function getQuiz(quizId: number): Promise<QuizDetail> {
 
 export async function submitQuiz(
   quizId: number,
-  answers: { question_id: number; answer: number | boolean }[]
+  answers: { question_id: number; answer: number | boolean | null }[]
 ): Promise<AttemptResult> {
   const res = await API.post(`/quiz/${quizId}/submit`, { answers })
   return res.data

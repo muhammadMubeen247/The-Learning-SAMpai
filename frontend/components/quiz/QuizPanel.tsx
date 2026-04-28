@@ -144,11 +144,13 @@ export function QuizPanel({ fileId, canQuiz }: Props) {
     try {
       const payload = questions.map((q) => {
         const raw = answers[q.id]
-        let answer: number | boolean
-        if (q.type === "tf") {
+        let answer: number | boolean | null
+        if (raw == null) {
+          answer = null
+        } else if (q.type === "tf") {
           answer = raw === "true"
         } else {
-          answer = raw != null ? Number(raw) : -1
+          answer = Number(raw)
         }
         return { question_id: q.id, answer }
       })
@@ -247,6 +249,7 @@ export function QuizPanel({ fileId, canQuiz }: Props) {
         <div className="flex-1 flex flex-col items-center justify-center gap-3">
           <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
           <p className="text-sm text-muted-foreground">Generating your quiz…</p>
+          <p className="text-sm text-muted-foreground">This may take a few moments.</p>
         </div>
       )}
 

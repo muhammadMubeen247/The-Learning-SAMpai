@@ -21,7 +21,7 @@ class GenerateQuizRequest(BaseModel):
 
 class SubmitAnswer(BaseModel):
     question_id: int
-    answer: Union[int, bool]
+    answer: Optional[Union[int, bool]] = None
 
 
 class SubmitQuizRequest(BaseModel):

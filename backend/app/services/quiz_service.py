@@ -105,7 +105,36 @@ async def infer_difficulty(
     return QuizDifficulty.MEDIUM, "baseline"
 
 
-async def build_quiz_context(engine: Any, file_url: str, difficulty: QuizDifficulty) -> tuple[str, dict]:
+def _extract_chat_topics(
+    chat_turns: list[dict],
+    max_topics: int = 8,
+    max_chars_per_topic: int = 200,
+) -> list[str]:
+    topics: list[str] = []
+    seen: set[str] = set()
+    for turn in reversed(chat_turns):  # most recent first
+        if turn.get("role") != "user":
+            continue
+        content = (turn.get("content") or "").strip()
+        if not content:
+            continue
+        snippet = content[:max_chars_per_topic]
+        key = snippet.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        topics.append(snippet)
+        if len(topics) >= max_topics:
+            break
+    return list(reversed(topics))  # restore chronological order
+
+
+async def build_quiz_context(
+    engine: Any,
+    file_url: str,
+    difficulty: QuizDifficulty,
+    chat_topics: list[str] | None = None,
+) -> tuple[str, dict]:
     """Retrieve file-scoped context from the RAG engine for question generation."""
     params = DIFF_PARAMS[difficulty]
     qp = QueryParam(
@@ -114,7 +143,16 @@ async def build_quiz_context(engine: Any, file_url: str, difficulty: QuizDifficu
         file_filter=file_url,
         **params,
     )
-    seed = "Key concepts, definitions, relationships, and examples in this document."
+    if chat_topics:
+        joined = " | ".join(chat_topics)
+        seed = (
+            "Topics the learner has recently been studying and asking about: "
+            f"{joined}. Retrieve passages that explain, define, compare, or "
+            "give examples of these topics in the document."
+        )
+        print("Quiz context seed with chat topics:", seed)
+    else:
+        seed = "Key concepts, definitions, relationships, and examples in this document."
     result = await engine.aquery(seed, qp)
     ctx = (result.content if result else "") or ""
     if not ctx.strip():
@@ -122,7 +160,7 @@ async def build_quiz_context(engine: Any, file_url: str, difficulty: QuizDifficu
             "No content could be retrieved for this file. "
             "The file may not have been fully processed yet."
         )
-    return ctx, {"context_chars": len(ctx), **params}
+    return ctx, {"context_chars": len(ctx), "chat_topics_count": len(chat_topics or []), **params}
 
 
 async def generate_questions(
@@ -130,16 +168,17 @@ async def generate_questions(
     difficulty: QuizDifficulty,
     num_questions: int,
     file_url: str,
+    chat_topics: list[str] | None = None,
 ) -> list[dict]:
     """Call the LLM to produce N quiz questions grounded in context."""
-    questions = await _call_generate_llm(context, difficulty, num_questions, file_url)
+    questions = await _call_generate_llm(context, difficulty, num_questions, file_url, chat_topics=chat_topics)
     valid = _validate_questions(questions, num_questions)
     if len(valid) < num_questions:
         # One retry for missing questions
         missing = num_questions - len(valid)
         logger.info("generate_questions: retrying to fill %d missing questions", missing)
         try:
-            extra = await _call_generate_llm(context, difficulty, missing, file_url, temperature=0.0)
+            extra = await _call_generate_llm(context, difficulty, missing, file_url, temperature=0.0, chat_topics=chat_topics)
             valid += _validate_questions(extra, missing)
         except Exception:
             logger.warning("generate_questions: retry failed", exc_info=True)
@@ -159,7 +198,18 @@ async def _call_generate_llm(
     n: int,
     file_url: str,
     temperature: float = 0.7,
+    chat_topics: list[str] | None = None,
 ) -> list[dict]:
+    focus_block = ""
+    if chat_topics:
+        bulleted = "\n".join(f"  - {t}" for t in chat_topics)
+        focus_block = (
+            "\nFOCUS AREAS — the learner has recently been studying these topics "
+            "in chat. Weight roughly 60-70% of questions toward these areas; the "
+            "remaining questions may cover other key concepts in the context. "
+            "Do NOT invent topics not supported by the context.\n"
+            f"{bulleted}\n"
+        )
     system_prompt = (
         f"You write self-contained quiz questions GROUNDED ONLY in the provided context.\n"
         f"Output STRICT JSON only: {{\"questions\": [...]}}, EXACTLY {n} entries.\n"
@@ -173,6 +223,7 @@ async def _call_generate_llm(
         "  - easy:   recall of definitions / direct facts.\n"
         "  - medium: comparisons, application of one concept.\n"
         "  - hard:   synthesis across two concepts, cause-effect, edge cases.\n"
+        f"{focus_block}"
         "Mix MCQ and TF ~70/30. Distractors must be plausible but unambiguously wrong "
         "per the context. Never invent facts. No \"according to the document above\" "
         "framing. Output JSON only — no markdown fences."
@@ -186,7 +237,7 @@ async def _call_generate_llm(
     raw = await openai_llm_func(
         user_prompt,
         system_prompt=system_prompt,
-        **({"temperature": temperature} if temperature != 0.7 else {}),
+        temperature=temperature,
     )
     # Strip accidental code fences
     text = raw.strip()
@@ -303,9 +354,19 @@ async def generate_quiz_task(quiz_id: int) -> None:
             from app.services.classroom_rag import classroom_rag_service
             engine = await classroom_rag_service.get_engine(classroom.id)
 
-            ctx, ctx_meta = await build_quiz_context(engine, file.file_url, quiz.difficulty)
+            try:
+                chat_turns = await get_conversation_history_for_rag(db, quiz.file_id, quiz.user_id, limit=20)
+                chat_topics = _extract_chat_topics(chat_turns)
+            except Exception:
+                logger.warning(
+                    "generate_quiz_task: failed to load chat history for quiz_id=%s; "
+                    "falling back to generic seed", quiz_id, exc_info=True,
+                )
+                chat_topics = []
+
+            ctx, ctx_meta = await build_quiz_context(engine, file.file_url, quiz.difficulty, chat_topics=chat_topics)
             t0 = time.time()
-            questions = await generate_questions(ctx, quiz.difficulty, quiz.num_questions, file.file_url)
+            questions = await generate_questions(ctx, quiz.difficulty, quiz.num_questions, file.file_url, chat_topics=chat_topics)
 
             quiz.questions = questions
             quiz.generation_meta = {
