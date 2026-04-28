@@ -137,11 +137,31 @@ Dual-track ingestion: Docling parses bytes once, output is split into text vs. m
 
 The file's canonical citation key in the knowledge base is `file.file_url` (the R2 URL), not the filename or DB id — this is what appears in RAG source references.
 
+### Quiz system (`backend/app/services/quiz_service.py`, `routes/quiz.py`)
+
+Four endpoints under `/quiz/`:
+- `POST /quiz/files/{file_id}/generate` (202) — creates a `Quiz` row, dispatches `generate_quiz_task` as a `BackgroundTask`.
+- `GET /quiz/{quiz_id}` — polls status; returns questions once `READY`, includes attempt if already submitted.
+- `POST /quiz/{quiz_id}/submit` — grades answers, persists `QuizAttempt`.
+- `GET /quiz/files/{file_id}/history` — all past attempts for a file.
+
+**Difficulty inference** (`infer_difficulty`): fetches last 20 chat turns + last 3 `QuizAttempt` rows, calls the LLM with heuristics (score ≥ 0.8 → step up; < 0.5 → step down; confusion language in chat → step down). Falls back to `MEDIUM` if inference fails.
+
+**Background task** (`generate_quiz_task`):
+1. Fetches recent chat history via `get_conversation_history_for_rag`; calls `_extract_chat_topics` to pull up to 8 recent user questions as topic hints (deduped, truncated to 200 chars each). Falls back silently to empty list on error.
+2. `build_quiz_context` seeds the RAG query with those topic hints if present (mode `mix`, `only_need_context=True`, `file_filter=file_url`, difficulty-scaled params). Without chat history, uses the generic seed.
+3. `generate_questions` → `_call_generate_llm`: produces a 70 % MCQ / 30 % T/F mix grounded strictly in retrieved context. When topic hints are present, the system prompt adds a `FOCUS AREAS` block directing the LLM to weight 60–70 % of questions toward those topics. One retry at `temperature=0` fills any missing questions.
+4. Persists `questions` (JSONB), `generation_meta` (includes `chat_topics_count` for observability), sets status `READY`.
+
+**`generation_meta`** stored on each Quiz: `context_chars`, `chat_topics_count`, `traversal_hops`, `max_graph_neighbors`, `top_k`, `chunk_top_k`, `elapsed_s`, `model`.
+
+**Grading** (`grade_attempt`): pure function, no I/O — takes stored questions + submitted answers, coerces types, returns `score`, `correct_count`, `total_count`, and per-question review.
+
 ### Relational models (`backend/app/models/`)
 
-`user`, `classroom` (many-to-many `classroom_members`), `folder`, `file` (with `ProcessingStatus` enum: `PENDING`/`PROCESSING`/`COMPLETED`/`FAILED`), `chat_message` (with `MessageRole` enum). The `topic` model has been removed; commented-out legacy code still references it in several files — don't reintroduce it.
+`user`, `classroom` (many-to-many `classroom_members`), `folder`, `file` (with `ProcessingStatus` enum: `PENDING`/`PROCESSING`/`COMPLETED`/`FAILED`), `chat_message` (with `MessageRole` enum), `quiz` (`Quiz` + `QuizAttempt` — `QuizStatus`: `pending`/`generating`/`ready`/`failed`/`submitted`; `QuizDifficulty`: `easy`/`medium`/`hard`). The `topic` model has been removed; commented-out legacy code still references it in several files — don't reintroduce it.
 
-Cascade deletes: deleting a classroom cascades to folders → files → chat messages. Deleting a file also requires calling `engine.adelete_file(file.file_url)` to remove KB data — see `routes/file.py` delete endpoint.
+Cascade deletes: deleting a classroom cascades to folders → files → chat messages. Deleting a file also requires calling `engine.adelete_file(file.file_url)` to remove KB data — see `routes/file.py` delete endpoint. `Quiz` has a one-to-one `QuizAttempt` with `cascade="all, delete-orphan"`.
 
 ### Frontend (`frontend/`)
 
@@ -171,4 +191,5 @@ Backend CI spins up Postgres 16 + Neo4j 5.18 as services, runs `alembic upgrade 
   Symptom to recognize: `ImportError: DLL load failed while importing <module>: A dynamic link library (DLL) initialization routine failed.` with `SmartAppControlState: On` in `Get-MpComputerStatus`.
 - **ChromaDB telemetry noise**: chromadb 0.4.24 × posthog 7.x have an ABI mismatch (`capture() takes 1 positional argument but 3 were given`). `Settings(anonymized_telemetry=False)` silences post-init events, and `_configure_logging()` in `app/main.py` sets `chromadb.telemetry.product.posthog` to CRITICAL to suppress the one constructor-time `ClientStartEvent` that fires before Settings is read.
 - **Async SQLAlchemy — always eager-load relationships**: `db.get(Model, id)` never loads ORM relationships. Accessing a relationship attribute afterward (e.g. `quiz.attempt`) inside an async session triggers a synchronous lazy-load and crashes with `MissingGreenlet`. **Rule**: any route that reads a relationship must use `select(Model).options(selectinload(Model.rel)).where(...)` at query time. `db.get()` is only safe when you need the row itself and will not touch any relationship attribute.
+- **LLM model env vars**: `OPENAI_MODEL` selects the text LLM (defaults to `gpt-4o-mini`) used by `openai_llm_func` in `rag/utils.py` — this drives quiz difficulty inference and question generation. `VISION_MODEL` selects the vision LLM (defaults to `gpt-4o`) used by `openai_vision_func` for multimodal ingestion. Neither appears in `.env.docker.example` but both are read at call time.
 - **Stale `"mode": "mix"` strings in `routes/chat.py`**: the live ask endpoint uses `mode="naive"`, but the `chat_messages.metadata` JSON written at line 106 still records `"mode": "mix"`, and the `/chat/files/{id}/stats` response at line 173 still reports `"retrieval_mode": "mix"`. These are cosmetic labels not used for routing — left intentionally untouched during the mix→naive switch to keep the change set minimal. Update them in a separate small commit if the values matter for downstream analytics.
