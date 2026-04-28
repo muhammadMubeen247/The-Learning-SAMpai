@@ -155,7 +155,7 @@ Four endpoints under `/quiz/`:
 
 **`generation_meta`** stored on each Quiz: `context_chars`, `chat_topics_count`, `traversal_hops`, `max_graph_neighbors`, `top_k`, `chunk_top_k`, `elapsed_s`, `model`.
 
-**Grading** (`grade_attempt`): pure function, no I/O — takes stored questions + submitted answers, coerces types, returns `score`, `correct_count`, `total_count`, and per-question review.
+**Grading** (`grade_attempt`): pure function, no I/O — takes stored questions + submitted answers, coerces types, returns `score`, `correct_count`, `total_count`, and per-question review. Unanswered questions (sent as `null`) are always marked wrong — `null` is a valid value in `SubmitAnswer.answer` for this purpose.
 
 ### Relational models (`backend/app/models/`)
 
