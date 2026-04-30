@@ -157,11 +157,30 @@ Four endpoints under `/quiz/`:
 
 **Grading** (`grade_attempt`): pure function, no I/O — takes stored questions + submitted answers, coerces types, returns `score`, `correct_count`, `total_count`, and per-question review. Unanswered questions (sent as `null`) are always marked wrong — `null` is a valid value in `SubmitAnswer.answer` for this purpose.
 
+### Flashcard system (`backend/app/services/flashcard_service.py`, `routes/flashcards.py`)
+
+Five endpoints under `/flashcards/`:
+- `POST /flashcards/files/{file_id}/generate` (202) — creates a `FlashcardDeck` row, dispatches `generate_deck_task` as a `BackgroundTask`. `card_count` must be 10, 20, or 30. Prevents duplicate in-progress decks; stale `GENERATING` decks older than 5 min are auto-failed.
+- `GET /flashcards/{deck_id}` — polls status; returns cards (front/back/card_type/box/next_review_at) once `READY`.
+- `GET /flashcards/files/{file_id}/due` — all cards with `next_review_at <= now`, ordered by due date.
+- `GET /flashcards/files/{file_id}/history` — deck history + box distribution for the latest ready deck.
+- `POST /flashcards/cards/{card_id}/review` — submits `result` (`know`/`unsure`/`forgot`), advances/regresses Leitner box, writes a `FlashcardReview` audit row.
+
+**Leitner spaced-repetition** (`review_card` — pure function): `LEITNER_INTERVALS = {1:0, 2:1, 3:3, 4:7, 5:14}` days. `know` → box+1 (max 5), `unsure` → box−1 (min 1), `forgot` → box 1.
+
+**Background task** (`generate_deck_task`):
+1. `build_deck_context` issues a `mode="naive"` query with `chunk_top_k=25` (broader than chat's 20) using a generic seed that asks for all key terms, definitions, concepts, examples, and formulas.
+2. `_collect_existing_fronts` fetches up to 100 existing card fronts for that user+file and injects a dedup block into the LLM prompt to avoid semantic duplicates across regenerations.
+3. `generate_cards` → `_call_generate_llm`: produces ~50% definition / ~25% concept / ~25% example / formula-when-warranted mix. One retry at `temperature=0` fills shortfall. Raises `MalformedCardsError` if still short.
+4. Persists `Flashcard` rows (box=1, next_review_at=now), updates `deck.generation_meta` (`context_chars`, `chunk_top_k`, `elapsed_s`, `model`, `dedup_skipped`), sets status `READY`.
+
+Note: `_resolve_file_classroom` is imported from `quiz_service` — flashcard_service reuses it to load the file and verify classroom membership.
+
 ### Relational models (`backend/app/models/`)
 
-`user`, `classroom` (many-to-many `classroom_members`), `folder`, `file` (with `ProcessingStatus` enum: `PENDING`/`PROCESSING`/`COMPLETED`/`FAILED`), `chat_message` (with `MessageRole` enum), `quiz` (`Quiz` + `QuizAttempt` — `QuizStatus`: `pending`/`generating`/`ready`/`failed`/`submitted`; `QuizDifficulty`: `easy`/`medium`/`hard`). The `topic` model has been removed; commented-out legacy code still references it in several files — don't reintroduce it.
+`user`, `classroom` (many-to-many `classroom_members`), `folder`, `file` (with `ProcessingStatus` enum: `PENDING`/`PROCESSING`/`COMPLETED`/`FAILED`), `chat_message` (with `MessageRole` enum), `quiz` (`Quiz` + `QuizAttempt` — `QuizStatus`: `pending`/`generating`/`ready`/`failed`/`submitted`; `QuizDifficulty`: `easy`/`medium`/`hard`), `flashcard_deck` (`FlashcardDeck` + `Flashcard` + `FlashcardReview` — `FlashcardDeckStatus`: `pending`/`generating`/`ready`/`failed`; `FlashcardCardType`: `definition`/`concept`/`example`/`formula`). The `topic` model has been removed; commented-out legacy code still references it in several files — don't reintroduce it.
 
-Cascade deletes: deleting a classroom cascades to folders → files → chat messages. Deleting a file also requires calling `engine.adelete_file(file.file_url)` to remove KB data — see `routes/file.py` delete endpoint. `Quiz` has a one-to-one `QuizAttempt` with `cascade="all, delete-orphan"`.
+Cascade deletes: deleting a classroom cascades to folders → files → chat messages. Deleting a file also requires calling `engine.adelete_file(file.file_url)` to remove KB data — see `routes/file.py` delete endpoint. `Quiz` has a one-to-one `QuizAttempt` with `cascade="all, delete-orphan"`. `FlashcardDeck.cards` has `cascade="all, delete-orphan"`; `Flashcard` and `FlashcardReview` also have `ondelete="CASCADE"` FKs to `files` and `users`.
 
 ### Frontend (`frontend/`)
 
