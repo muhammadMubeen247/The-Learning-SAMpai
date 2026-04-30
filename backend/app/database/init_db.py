@@ -1,6 +1,6 @@
 from app.database.base import Base
 from app.database.session import async_engine
-from app.models import user, classroom, folder, file, chat_message, quiz  # noqa: F401 — registers tables
+from app.models import user, classroom, folder, file, chat_message, quiz, flashcard  # noqa: F401 — registers tables
 
 
 async def init_db():

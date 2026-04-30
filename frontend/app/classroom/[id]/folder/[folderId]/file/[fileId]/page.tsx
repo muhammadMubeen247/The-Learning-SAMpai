@@ -13,6 +13,7 @@ import { LoadingOverlay } from "@/components/ui/liquid-orb-loader"
 import { Download, Send, Loader2, FileText, CheckCircle2, Clock, AlertCircle, RefreshCw } from "lucide-react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { QuizPanel } from "@/components/quiz/QuizPanel"
+import { FlashcardPanel } from "@/components/flashcards/FlashcardPanel"
 
 const Squares = dynamic(() => import("@/components/backgrounds/squares"), { ssr: false })
 
@@ -403,11 +404,12 @@ export default function FilePage() {
               )}
             </div>
 
-            {/* ── Chat / Quiz tabs ── */}
+            {/* ── Chat / Quiz / Flashcards tabs ── */}
             <Tabs defaultValue="chat" className="flex-1 flex flex-col min-h-0">
               <TabsList className="self-start mx-0 mb-1">
                 <TabsTrigger value="chat">Chat</TabsTrigger>
                 <TabsTrigger value="quiz">Quiz</TabsTrigger>
+                <TabsTrigger value="flashcards">Flashcards</TabsTrigger>
               </TabsList>
 
               <TabsContent value="chat" className="flex-1 flex flex-col min-h-0 mt-0">
@@ -511,6 +513,12 @@ export default function FilePage() {
               <TabsContent value="quiz" className="flex-1 flex flex-col min-h-0 mt-0">
                 <div className="flex-1 flex flex-col min-h-0 rounded-xl border border-border bg-card/50 backdrop-blur-sm overflow-hidden">
                   <QuizPanel fileId={Number(fileId)} canQuiz={canChat} />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="flashcards" className="flex-1 flex flex-col min-h-0 mt-0">
+                <div className="flex-1 flex flex-col min-h-0 rounded-xl border border-border bg-card/50 backdrop-blur-sm overflow-hidden">
+                  <FlashcardPanel fileId={Number(fileId)} canFlashcard={canChat} />
                 </div>
               </TabsContent>
             </Tabs>
