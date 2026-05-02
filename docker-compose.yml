@@ -69,6 +69,18 @@ services:
     networks:
       - app-network
 
+  # Redis (WebSocket real-time fan-out)
+  redis:
+    image: redis:7-alpine
+    container_name: learning-sampai-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - app-network
+
   # Backend API
   backend:
     build:
@@ -111,6 +123,7 @@ volumes:
   neo4j_data:
   neo4j_logs:
   chroma_data:
+  redis_data:
 
 networks:
   app-network:

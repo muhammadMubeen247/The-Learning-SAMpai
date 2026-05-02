@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Boolean, Column, Integer, String
 from sqlalchemy.orm import relationship
 from app.database.base import Base
 
@@ -9,7 +9,8 @@ class User(Base):
     username = Column(String(255), unique=True, nullable=False, index=True)
     email = Column(String(255), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
-    
+    is_system = Column(Boolean, nullable=False, default=False)
+
     # Relationships
     owned_classrooms = relationship("Classroom", foreign_keys="Classroom.owner_id", back_populates="owner")
     classrooms = relationship("Classroom", secondary="classroom_members", back_populates="members")

@@ -10,7 +10,6 @@ import API from "@/api/axios"
 import { normalizeErrorDetail } from "@/lib/error-utils"
 import { useTheme } from "@/hooks/use-theme"
 import { LoadingOrb } from "@/components/ui/liquid-orb-loader"
-
 type FileType = {
   id: number
   filename: string
@@ -188,7 +187,7 @@ export default function FilesSection({ classroomId, folderId, isOwner, onFileUpl
 
   useEffect(() => {
     void fetchFiles()
-    
+
     // Cleanup polling on unmount
     return () => {
       if (pollingIntervalRef.current) {
@@ -196,7 +195,7 @@ export default function FilesSection({ classroomId, folderId, isOwner, onFileUpl
         pollingIntervalRef.current = null
       }
     }
-  }, [folderId])
+  }, [folderId])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -500,6 +499,7 @@ export default function FilesSection({ classroomId, folderId, isOwner, onFileUpl
                         <Trash2 className="h-4.5 w-4.5" />
                       </button>
                     )}
+
                   </div>
                 </div>
               )

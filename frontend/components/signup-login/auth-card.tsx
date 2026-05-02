@@ -164,6 +164,7 @@ export function AuthCard({ initialMode = "signup" }: AuthCardProps) {
       if (res.data.user) {
         localStorage.setItem("user", JSON.stringify(res.data.user))
       }
+      window.dispatchEvent(new Event("auth:login"))
       setLoadingProgress(90)
       setMessage("Login successful! Redirecting...")
       setLoadingProgress(100)

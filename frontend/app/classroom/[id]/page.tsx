@@ -12,6 +12,7 @@ import ClassroomHeader from "@/components/classroom/header"
 import FoldersSection from "@/components/classroom/folders-section"
 import AnnouncementsSection from "@/components/classroom/announcements-section"
 import ClassroomCodeDisplay from "@/components/classroom/code-display"
+import GroupChatsTab from "@/components/classroom/group-chats-tab"
 import { LoadingOverlay } from "@/components/ui/liquid-orb-loader"
 
 const Squares = dynamic(() => import("@/components/backgrounds/squares"), { ssr: false })
@@ -43,6 +44,7 @@ export default function ClassroomPage() {
   const [loadingProgress, setLoadingProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [activeTab, setActiveTab] = useState<"files" | "groups">("files")
 
   const fetchClassroom = async () => {
     setLoading(true)
@@ -169,53 +171,90 @@ export default function ClassroomPage() {
             sidebarCollapsed ? "ml-0" : "ml-[280px]"
           }`}
         >
-          {/* Folders Section with Squares Background */}
-          <div className="relative flex-1 overflow-hidden">
-            <div className="absolute inset-0 opacity-60 pointer-events-none z-0">
-              <Squares
-                speed={0.5}
-                squareSize={40}
-                direction="diagonal"
-                borderColor={borderColor}
-                hoverFillColor={hoverFillColor}
-              />
-            </div>
-            <div className="relative z-10 h-full overflow-y-auto overflow-x-hidden">
-              <FoldersSection
-                classroomId={classroomId}
-                isOwner={isOwner ?? false}
-                onFolderCreated={() => {
-                  // Refetch folders will be handled by FoldersSection
-                }}
-              />
-            </div>
+          {/* Tab bar */}
+          <div className="fixed top-16 z-20 flex border-b border-border bg-background/80 backdrop-blur-sm" style={{ width: sidebarCollapsed ? "100%" : "calc(100% - 280px)" }}>
+            <button
+              onClick={() => setActiveTab("files")}
+              className={`px-5 py-2.5 text-sm font-medium transition-colors border-b-2 ${
+                activeTab === "files"
+                  ? "border-violet-500 text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Files
+            </button>
+            <button
+              onClick={() => setActiveTab("groups")}
+              className={`px-5 py-2.5 text-sm font-medium transition-colors border-b-2 ${
+                activeTab === "groups"
+                  ? "border-violet-500 text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Group Chats
+            </button>
           </div>
 
-          {/* Announcements Section with Plasma Background */}
-          <div className="relative border-t border-border overflow-hidden">
-            <div 
-              className="absolute bottom-0 left-0 right-0 opacity-80 pointer-events-none z-0"
-              style={{ 
-                height: '50vh',
-                maxHeight: '50vh',
-                width: '100%',
-                top: 'auto'
-              }}
-            >
-              <Plasma
-                key={`plasma-${pathname}`}
-                color={plasmaColor}
-                speed={0.6}
-                direction="forward"
-                scale={1.08}
-                opacity={0.6}
-                mouseInteractive={false}
-              />
+          {/* Tab content */}
+          {activeTab === "files" ? (
+            <>
+              {/* Folders Section with Squares Background */}
+              <div className="relative flex-1 overflow-hidden">
+                <div className="absolute inset-0 opacity-60 pointer-events-none z-0">
+                  <Squares
+                    speed={0.5}
+                    squareSize={40}
+                    direction="diagonal"
+                    borderColor={borderColor}
+                    hoverFillColor={hoverFillColor}
+                  />
+                </div>
+                <div className="relative z-10 h-full overflow-y-auto overflow-x-hidden">
+                  <FoldersSection
+                    classroomId={classroomId}
+                    isOwner={isOwner ?? false}
+                    onFolderCreated={() => {}}
+                  />
+                </div>
+              </div>
+
+              {/* Announcements Section with Plasma Background */}
+              <div className="relative border-t border-border overflow-hidden">
+                <div
+                  className="absolute bottom-0 left-0 right-0 opacity-80 pointer-events-none z-0"
+                  style={{ height: "50vh", maxHeight: "50vh", width: "100%", top: "auto" }}
+                >
+                  <Plasma
+                    key={`plasma-${pathname}`}
+                    color={plasmaColor}
+                    speed={0.6}
+                    direction="forward"
+                    scale={1.08}
+                    opacity={0.6}
+                    mouseInteractive={false}
+                  />
+                </div>
+                <div className="relative z-10">
+                  <AnnouncementsSection isOwner={isOwner ?? false} />
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="relative flex-1 overflow-hidden">
+              <div className="absolute inset-0 opacity-60 pointer-events-none z-0">
+                <Squares
+                  speed={0.5}
+                  squareSize={40}
+                  direction="diagonal"
+                  borderColor={borderColor}
+                  hoverFillColor={hoverFillColor}
+                />
+              </div>
+              <div className="relative z-10 h-full overflow-y-auto overflow-x-hidden">
+                <GroupChatsTab classroomId={classroomId} />
+              </div>
             </div>
-            <div className="relative z-10">
-              <AnnouncementsSection isOwner={isOwner ?? false} />
-            </div>
-          </div>
+          )}
         </main>
 
         {/* Floating Classroom Code Display (Owner Only) */}

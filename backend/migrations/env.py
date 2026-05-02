@@ -16,6 +16,7 @@ from app.models.classroom import Classroom
 from app.models.file import File
 from app.models.folder import Folder
 from app.models.chat_message import ChatMessage
+from app.models.group_chat import GroupChat, GroupChatMember, GroupChatInvite, GroupChatMessage
 
 # Load environment variables — override=True so .env always wins over shell env
 _env_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")

@@ -4,6 +4,11 @@ const API = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000",
 });
 
+const _apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+export const WS_BASE = _apiBase
+  .replace(/^https:\/\//, "wss://")
+  .replace(/^http:\/\//, "ws://");
+
 // Attach token and log request
 API.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {

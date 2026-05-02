@@ -1,7 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { Menu, ChevronRight } from "lucide-react"
+import { useRouter, useParams } from "next/navigation"
+import { Menu, ChevronRight, Bell, MessageSquare } from "lucide-react"
 import { ThemeToggle } from "@/components/theme/theme-toggle"
 import {
   DropdownMenu,
@@ -10,6 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
+import { useRealtimeContext } from "@/providers/realtime-provider"
 
 type ClassroomHeaderProps = {
   classroomName: string
@@ -36,6 +38,15 @@ export default function ClassroomHeader({
   folderId,
   fileId,
 }: ClassroomHeaderProps) {
+  const router = useRouter()
+  const params = useParams()
+  const currentClassroomId = classroomId ?? (params?.id ? Number(params.id) : undefined)
+
+  const { pendingInvites, acceptInvite, rejectInvite, unreadByThread } = useRealtimeContext()
+  const inviteCount = pendingInvites.length
+  const unreadEntries = Object.entries(unreadByThread).filter(([, count]) => count > 0)
+  const totalNotifications = inviteCount + unreadEntries.length
+
   return (
     <div className="fixed top-0 left-0 right-0 z-50 h-16 border-b border-border bg-background/80 backdrop-blur-xl">
       <div className="flex items-center justify-between h-full px-4">
@@ -119,6 +130,77 @@ export default function ClassroomHeader({
           )}
         </div>
         <div className="flex items-center space-x-2">
+          {/* Invite notification bell */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="relative p-2 rounded-md hover:bg-card/50 transition-colors cursor-pointer"
+                aria-label={`${totalNotifications} notification${totalNotifications !== 1 ? "s" : ""}`}
+              >
+                <Bell className="size-5 text-foreground" />
+                {totalNotifications > 0 && (
+                  <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-violet-600 text-[10px] text-white font-bold flex items-center justify-center">
+                    {totalNotifications > 9 ? "9+" : totalNotifications}
+                  </span>
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-80 max-h-96 overflow-y-auto">
+              {totalNotifications === 0 ? (
+                <div className="px-4 py-3 text-sm text-muted-foreground">No notifications</div>
+              ) : (
+                <>
+                  {pendingInvites.map((inv) => (
+                    <div key={`inv-${inv.id}`} className="px-4 py-3 flex flex-col gap-2 border-b border-border last:border-0">
+                      <p className="text-sm">
+                        <span className="font-medium">{inv.inviter.username}</span>
+                        {" invited you to a group chat"}
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => void acceptInvite(inv.id)}
+                          className="flex-1 rounded-md bg-violet-600 hover:bg-violet-500 text-white text-xs py-1.5 font-medium transition-colors cursor-pointer"
+                        >
+                          Accept
+                        </button>
+                        <button
+                          onClick={() => void rejectInvite(inv.id)}
+                          className="flex-1 rounded-md border border-border hover:bg-muted text-xs py-1.5 transition-colors cursor-pointer"
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {unreadEntries.map(([threadIdStr, count]) => {
+                    const threadId = Number(threadIdStr)
+                    return (
+                      <button
+                        key={`unread-${threadId}`}
+                        onClick={() => {
+                          if (currentClassroomId) {
+                            router.push(`/classroom/${currentClassroomId}/group/${threadId}`)
+                          }
+                        }}
+                        className="w-full px-4 py-3 flex items-center gap-3 border-b border-border last:border-0 hover:bg-muted/40 cursor-pointer text-left"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-violet-600/20 flex items-center justify-center shrink-0">
+                          <MessageSquare className="w-4 h-4 text-violet-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">Group chat</p>
+                          <p className="text-xs text-muted-foreground">
+                            {count} new message{count !== 1 ? "s" : ""}
+                          </p>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <ThemeToggle />
           <DropdownMenu>
             <DropdownMenuTrigger>

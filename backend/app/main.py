@@ -67,6 +67,26 @@ def _configure_logging() -> None:
 
 from app.database.init_db import init_db
 from app.routes import auth, classroom, folder, file, chat, quiz, flashcards as flashcards_router
+from app.routes import group_chat as group_chat_router
+
+
+async def _load_sampai_user_id(app: FastAPI) -> None:
+    from sqlalchemy import select, text
+    from app.database.session import AsyncSessionLocal
+    from app.models.user import User
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(User.id).where(User.username == "SAMpai", User.is_system.is_(True))
+        )
+        sampai_id = result.scalar_one_or_none()
+
+    if sampai_id is None:
+        raise RuntimeError(
+            "SAMpai system user not found. Run 'alembic upgrade head' to seed it."
+        )
+    app.state.sampai_user_id = sampai_id
+    logging.getLogger(__name__).info(f"SAMpai system user cached: id={sampai_id}")
 
 
 @asynccontextmanager
@@ -76,12 +96,44 @@ async def lifespan(app: FastAPI):
     _configure_logging()
     logging.getLogger(__name__).info("Learning SAMpai backend starting up")
     await init_db()
+    await _load_sampai_user_id(app)
+
+    # Real-time WebSocket connection manager + optional Redis fan-out
+    from app.realtime.connection_manager import ConnectionManager
+    from app.realtime.redis_client import init_redis, close_redis
+
+    cm = ConnectionManager()
+    redis = None
+    if os.getenv("WS_FANOUT", "memory") == "redis":
+        redis = await init_redis()
+    await cm.start(redis)
+    app.state.connection_manager = cm
+    app.state.redis = redis
+
+    # Group chat AI agent
+    from app.services.group_chat_agent import GroupChatAgent
+    from app.services.classroom_rag import classroom_rag_service
+    from openai import AsyncOpenAI
+
+    openai_client = AsyncOpenAI()
+    agent = GroupChatAgent(
+        sampai_user_id=app.state.sampai_user_id,
+        classroom_rag_service=classroom_rag_service,
+        connection_manager=cm,
+        openai_client=openai_client,
+    )
+    app.state.group_chat_agent = agent
 
     yield
 
     # ── Shutdown ──────────────────────────────────────────────────────────
     from app.services.classroom_rag import classroom_rag_service
     from app.rag.storage.postgres_kv import close_pool
+
+    await app.state.connection_manager.stop()
+    if os.getenv("WS_FANOUT", "memory") == "redis":
+        from app.realtime.redis_client import close_redis as _close_redis
+        await _close_redis()
 
     await classroom_rag_service.finalize_all()
     await close_pool()
@@ -110,6 +162,7 @@ app.include_router(file.router)
 app.include_router(chat.router)
 app.include_router(quiz.router)
 app.include_router(flashcards_router.router)
+app.include_router(group_chat_router.router)
 
 
 @app.get("/")

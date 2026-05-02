@@ -176,6 +176,50 @@ Five endpoints under `/flashcards/`:
 
 Note: `_resolve_file_classroom` is imported from `quiz_service` — flashcard_service reuses it to load the file and verify classroom membership.
 
+### Group chat system (`backend/app/services/group_chat_service.py`, `routes/group_chat.py`)
+
+Eleven HTTP endpoints + two WebSocket endpoints under `/group-chat`:
+- `GET /group-chat/files/{file_id}/eligible-invitees` — classroom members minus self, already-invited, already-joined.
+- `POST /group-chat/files/{file_id}/invite` — body `{user_ids, group_chat_id?}`; creates thread on first invite for a file, reuses on subsequent. Returns thread + invite list.
+- `GET /group-chat/invites/pending`, `POST /group-chat/invites/{id}/accept`, `.../reject`, `.../cancel`.
+- `GET /group-chat/threads`, `GET /group-chat/threads/{id}`, `POST /group-chat/threads/{id}/leave`, `POST /group-chat/threads/{id}/read`.
+- `POST /group-chat/threads/{id}/messages` — validates membership, parses mentions, writes with monotonic `seq` (SELECT FOR UPDATE on parent row), broadcasts `message_new`. Returns persisted message. Idempotent on `client_msg_id`.
+- `GET /group-chat/threads/{id}/messages?before_seq=&limit=` — reverse-chronological pagination.
+- `WS /group-chat/ws/group-chat/{group_chat_id}?token=` — per-thread socket (presence, typing, message_new, message_discarded, read_receipt events).
+- `WS /group-chat/ws/user?token=` — user-level socket (invite_new, invite_cancelled, thread_unread_bump events).
+
+**Background tasks** (SAMpai agent — `services/group_chat_agent.py`):
+- **Guard path** (`run_guard`): fires as BackgroundTask on every non-`@SAMpai` message. Three-stage funnel: (A) heuristic skip (short/grace-period/reply-to-agent), (B) Chroma vector similarity vs document, (C) `instructor` + `gpt-4o-mini` LLM judge. Off-topic → mark message `is_discarded=true`, broadcast `message_discarded`, insert SAMpai AGENT row with warning.
+- **Respond path** (`run_respond`): fires when `mentions` JSONB contains `{"kind":"agent"}`. Builds context (recent 12 non-discarded messages + mentioned users' last 3 messages + replied-to message), calls `engine.aquery(mode="naive", file_filter=file.file_url)` with multi-speaker conversation history, inserts AGENT row as reply, broadcasts. Per-thread `asyncio.Semaphore(1)` serializes concurrent respond calls.
+
+**Storage** (new tables in `models/group_chat.py`):
+- `group_chats` — thread anchored to a `File` and `Classroom`.
+- `group_chat_members` — composite PK `(group_chat_id, user_id)`, roles OWNER/MEMBER, `last_read_seq` for unread count.
+- `group_chat_invites` — PENDING/ACCEPTED/REJECTED/EXPIRED/CANCELLED lifecycle.
+- `group_chat_messages` — `seq` monotonic per-thread, `mentions` JSONB, `reply_to_id`, `is_discarded`, `client_msg_id` idempotency key.
+- SAMpai system user: `users.is_system=true`, `username='SAMpai'`, cached at startup as `app.state.sampai_user_id`. Signup blocks the "sampai" username (case-insensitive, see `constants.py`).
+
+**Real-time layer** (`realtime/`):
+- `connection_manager.py` — in-memory per-thread rooms + per-user registry. Redis pub/sub fan-out optional via `WS_FANOUT=redis` env var (defaults to `memory`).
+- `events.py` — Pydantic event schemas, all versioned `v=1`.
+- `rate_limit.py` — Redis sliding-window: 10 messages/10s per user/thread, 3 `@SAMpai` calls/60s per user/thread.
+
+**Critical invariants** (violating any of these silently corrupts agent behavior):
+- **Discarded messages excluded from agent context**: `fetch_recent_messages` and `fetch_last_messages_from_user` both filter `WHERE is_discarded = false`. The agent must never see the message it just discarded.
+- **`@SAMpai` mentions skip the guard**: the dispatch in the POST handler checks `has_agent_mention` before queueing — only one path runs, never both.
+- **Mentions parsed and stored at write time**: `mentions` JSONB is the source of truth; the agent never re-parses raw content.
+- **`file.processing_status == COMPLETED`** is a precondition for `@SAMpai` respond calls; returns "still indexing" message otherwise.
+- **`client_msg_id` dedup**: server returns the existing row on conflict rather than inserting twice.
+- **`seq` is server-assigned**: clients set only `client_msg_id`, never `seq`.
+
+**Frontend** (`components/group-chat/`, `hooks/use-group-chat-socket.ts`, `providers/realtime-provider.tsx`):
+- Route `/classroom/[id]/group/[groupChatId]` renders `GroupChatPanel` with virtualized message list, reply UX, mention autocomplete (SAMpai pinned last), typing indicator, markdown rendering for agent replies.
+- `useGroupChatSocket`: reconnects with exponential backoff, gap-fills via `GET .../messages?before_seq=` on reconnect, optimistic inserts reconciled by `client_msg_id`.
+- `RealtimeProvider` owns the global user WebSocket, hydrates pending invites + unread counts on mount, fires Sonner toasts on `invite_new`.
+- Classroom page has a "Group Chats" tab (`components/classroom/group-chats-tab.tsx`) showing all accepted threads with unread badges.
+- Bell icon in `ClassroomHeader` shows pending invite count + unread thread entries; accept/decline inline.
+- `InviteButton` is rendered in the file chat page header — opens `InviteDialog` to pick classroom members.
+
 ### Relational models (`backend/app/models/`)
 
 `user`, `classroom` (many-to-many `classroom_members`), `folder`, `file` (with `ProcessingStatus` enum: `PENDING`/`PROCESSING`/`COMPLETED`/`FAILED`), `chat_message` (with `MessageRole` enum), `quiz` (`Quiz` + `QuizAttempt` — `QuizStatus`: `pending`/`generating`/`ready`/`failed`/`submitted`; `QuizDifficulty`: `easy`/`medium`/`hard`), `flashcard_deck` (`FlashcardDeck` + `Flashcard` + `FlashcardReview` — `FlashcardDeckStatus`: `pending`/`generating`/`ready`/`failed`; `FlashcardCardType`: `definition`/`concept`/`example`/`formula`). The `topic` model has been removed; commented-out legacy code still references it in several files — don't reintroduce it.

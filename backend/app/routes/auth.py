@@ -10,6 +10,7 @@ from app.schemas.user import UserCreate, UserResponse, UserLogin
 from app.utils.hashing import hash_password, verify_password
 from app.utils.jwt_handler import create_access_token
 from app.dependencies.auth import get_current_user
+from app.constants import RESERVED_USERNAMES
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 logger = logging.getLogger(__name__)
@@ -18,6 +19,11 @@ logger = logging.getLogger(__name__)
 @router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def signup(payload: UserCreate, db: AsyncSession = Depends(get_db)):
     logger.info(f"[auth] SIGNUP attempt username={payload.username} email={payload.email}")
+    if payload.username.lower() in RESERVED_USERNAMES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="This username is reserved",
+        )
     result = await db.execute(
         select(User).where(or_(User.email == payload.email, User.username == payload.username))
     )

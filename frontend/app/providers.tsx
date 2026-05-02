@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
 import { ThemeProvider } from "next-themes"
+import { Toaster } from "@/components/ui/sonner"
+import { RealtimeProvider } from "@/providers/realtime-provider"
 
 type AuthContextType = {
   isHydrated: boolean
@@ -23,7 +25,10 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{ isHydrated }}>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-        {children}
+        <RealtimeProvider>
+          {children}
+        </RealtimeProvider>
+        <Toaster />
       </ThemeProvider>
     </AuthContext.Provider>
   )

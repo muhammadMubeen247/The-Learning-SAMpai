@@ -14,6 +14,7 @@ import { Download, Send, Loader2, FileText, CheckCircle2, Clock, AlertCircle, Re
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { QuizPanel } from "@/components/quiz/QuizPanel"
 import { FlashcardPanel } from "@/components/flashcards/FlashcardPanel"
+import { InviteButton } from "@/components/group-chat/invite-button"
 
 const Squares = dynamic(() => import("@/components/backgrounds/squares"), { ssr: false })
 
@@ -375,6 +376,7 @@ export default function FilePage() {
                     <RefreshCw className="h-3.5 w-3.5" />
                   </button>
                 )}
+                <InviteButton fileId={fileId} classroomId={classroomId} />
               </div>
             </div>
 
