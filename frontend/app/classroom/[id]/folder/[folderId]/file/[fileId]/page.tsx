@@ -14,6 +14,7 @@ import { Download, Send, Loader2, FileText, CheckCircle2, Clock, AlertCircle, Re
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { QuizPanel } from "@/components/quiz/QuizPanel"
 import { FlashcardPanel } from "@/components/flashcards/FlashcardPanel"
+import MindmapShell from "@/components/mindmap/mindmap-shell"
 import { InviteButton } from "@/components/group-chat/invite-button"
 
 const Squares = dynamic(() => import("@/components/backgrounds/squares"), { ssr: false })
@@ -412,6 +413,7 @@ export default function FilePage() {
                 <TabsTrigger value="chat">Chat</TabsTrigger>
                 <TabsTrigger value="quiz">Quiz</TabsTrigger>
                 <TabsTrigger value="flashcards">Flashcards</TabsTrigger>
+                <TabsTrigger value="mindmap">Mindmap</TabsTrigger>
               </TabsList>
 
               <TabsContent value="chat" className="flex-1 flex flex-col min-h-0 mt-0">
@@ -521,6 +523,22 @@ export default function FilePage() {
               <TabsContent value="flashcards" className="flex-1 flex flex-col min-h-0 mt-0">
                 <div className="flex-1 flex flex-col min-h-0 rounded-xl border border-border bg-card/50 backdrop-blur-sm overflow-hidden">
                   <FlashcardPanel fileId={Number(fileId)} canFlashcard={canChat} />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="mindmap" className="flex-1 flex flex-col min-h-0 mt-0">
+                <div className="flex-1 rounded-xl border border-border bg-card/50 backdrop-blur-sm overflow-hidden" style={{ height: '100%' }}>
+                  {canChat ? (
+                    <MindmapShell
+                      fileId={Number(fileId)}
+                      classroomId={classroomId}
+                      fileName={file?.filename ?? ""}
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+                      Mindmap will be available once the document finishes processing.
+                    </div>
+                  )}
                 </div>
               </TabsContent>
             </Tabs>

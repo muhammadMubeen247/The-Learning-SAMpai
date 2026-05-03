@@ -51,3 +51,4 @@ backend/logs/
 
 #Claude
 .claude/
+repo/
