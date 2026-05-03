@@ -176,6 +176,45 @@ Five endpoints under `/flashcards/`:
 
 Note: `_resolve_file_classroom` is imported from `quiz_service` — flashcard_service reuses it to load the file and verify classroom membership.
 
+### Mindmap system (`backend/app/services/mindmap_generator.py`, `mindmap_service.py`, `mindmap_chat.py`, `routes/mindmap.py`)
+
+Six HTTP endpoints under `/mindmap`:
+- `POST /mindmap/files/{file_id}/generate` (202) — idempotent: READY returns existing; GENERATING returns in-flight; `force=True` → regenerate. Requires `processing_status == COMPLETED`.
+- `GET /mindmap/files/{file_id}` — poll status; returns full `tree_data` JSONB once READY.
+- `DELETE /mindmap/files/{file_id}` — owner only; deletes mindmap row (chat history preserved).
+- `POST /mindmap/{mindmap_id}/nodes/{node_id}/explore` — mark a node as explored for this user; returns `already_explored + last_message_id` if summary exists, else inserts MARKER + pending ASSISTANT placeholder and fires background summary task.
+- `GET /mindmap/{mindmap_id}/chat?limit=` — fetch per-user mindmap chat history.
+- `POST /mindmap/{mindmap_id}/chat/ask` — body `{content, active_node_id?}`; augments question with `[Currently exploring: {label}]`, calls `engine.aquery(mode="mix", traversal_hops=1)`, returns assistant message.
+- `DELETE /mindmap/{mindmap_id}/chat` — clear user's chat history.
+
+**Background tasks** (`services/mindmap_service.py`, `services/mindmap_chat.py`):
+- `generate_mindmap_task(file_id, classroom_id, force)`: pulls context via `mode="mix", only_need_context=True, traversal_hops=2, chunk_top_k=25`; calls `instructor` for RootTopic then MindmapTreePayload; assembles `tree_data = {version:1, root:{id,topic,description,depth,children:[...]}}`. Raises `MindmapTooShallowError` if < 2 top-level branches; records status FAILED with message. `MINDMAP_MAX_DEPTH=4`, `MINDMAP_MAX_CHILDREN_PER_NODE=6`, `MINDMAP_GENERATION_MODEL=gpt-4o-mini`.
+- `generate_node_summary_task(mindmap_id, node_id, placeholder_id, ...)`: calls `mode="mix", traversal_hops=2, chunk_top_k=15`; updates placeholder ASSISTANT row with the answer. Per-(user, mindmap) `asyncio.Semaphore(1)` serializes concurrent summary calls.
+
+**Storage** (`models/mindmap.py`):
+- `mindmaps` — one per file (UNIQUE FK→files), `tree_data` JSONB, `status` (pending/generating/ready/failed), `node_count`, `generation_meta`. Shared across all classroom members (one tree per file).
+- `mindmap_node_chats` — per-user chat rows: MARKER (separates node sections), ASSISTANT (pending=True while generating, then replaced), USER. Column is `message_metadata` NOT `metadata` (SQLAlchemy Base reserves `metadata`). Chat is **per-user** scoped by `user_id`.
+
+**`tree_data` shape**: `{version:1, root:{id:"n_root", topic, description, depth:0, children:[{id:"n_0001", topic, description, depth:1, children:[...]}]}}`. Node IDs are `"n_root"` for root and `"n_{counter:04d}"` for all others. `_find_node(tree_data, node_id)` recursively walks this shape.
+
+**Critical invariants**:
+- `MindmapNode.model_rebuild()` MUST be called after the Pydantic class body (recursive model — instructor needs the forward ref resolved before schema introspection).
+- `only_need_context=True` in tree-generation RAG call (skip answer-generation step).
+- Background tasks use `AsyncSessionLocal()` — same pattern as quiz/flashcard.
+- `values_callable=lambda x: [e.value for e in x]` on both SQLEnum columns in `models/mindmap.py`.
+- The shared tree is generated once; node summaries and chat are per-user.
+- File must have `processing_status == COMPLETED` before generation can start.
+
+**Frontend** (`components/mindmap/`, `hooks/use-mindmap.ts`, `hooks/use-mindmap-chat.ts`, `api/mindmap.ts`):
+- Mindmap appears as a **"Mindmap" tab** in the file page alongside Chat/Quiz/Flashcards.
+- `MindmapShell` — top-level component: shows generate prompt → spinner overlay → split canvas+chat.
+- `MindmapCanvas` — React Flow canvas (`@xyflow/react`) with `dagre` LR layout. Custom `mindmapNode` type.
+- `MindmapChatPanel` — right-hand chat sidebar (w-80). Shows MARKER-delimited node summaries + follow-up messages. Polls every 1.5s while any `message_metadata.pending === true`.
+- `layout.ts` — `buildFlow(root)` converts tree_data to React Flow nodes+edges with dagre positions.
+- `use-mindmap.ts` — polls `GET /mindmap/files/{id}` every 2s during generating/pending states.
+- `use-mindmap-chat.ts` — manages chat state, explore node, pending polling.
+- Packages added: `@xyflow/react`, `dagre`, `@types/dagre`.
+
 ### Group chat system (`backend/app/services/group_chat_service.py`, `routes/group_chat.py`)
 
 Eleven HTTP endpoints + two WebSocket endpoints under `/group-chat`:

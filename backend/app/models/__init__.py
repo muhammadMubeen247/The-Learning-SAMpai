@@ -13,6 +13,7 @@ from app.models.group_chat import (
     InviteStatus,
     GroupMessageRole,
 )
+from app.models.mindmap import Mindmap, MindmapNodeChat, MindmapStatus, MindmapMessageRole
 
 __all__ = [
     "User",
@@ -32,4 +33,8 @@ __all__ = [
     "GroupRole",
     "InviteStatus",
     "GroupMessageRole",
+    "Mindmap",
+    "MindmapNodeChat",
+    "MindmapStatus",
+    "MindmapMessageRole",
 ]
