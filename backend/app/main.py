@@ -114,9 +114,14 @@ async def lifespan(app: FastAPI):
     # Group chat AI agent
     from app.services.group_chat_agent import GroupChatAgent
     from app.services.classroom_rag import classroom_rag_service
+    import httpx
     from openai import AsyncOpenAI
 
-    openai_client = AsyncOpenAI()
+    openai_client = AsyncOpenAI(
+        http_client=httpx.AsyncClient(
+            timeout=httpx.Timeout(connect=30.0, read=120.0, write=30.0, pool=5.0),
+        ),
+    )
     agent = GroupChatAgent(
         sampai_user_id=app.state.sampai_user_id,
         classroom_rag_service=classroom_rag_service,
@@ -124,6 +129,40 @@ async def lifespan(app: FastAPI):
         openai_client=openai_client,
     )
     app.state.group_chat_agent = agent
+
+    # ── Phase 2 recovery ─────────────────────────────────────────────────
+    # Any file left in NAIVE_READY or PROCESSING at startup lost its Phase 2
+    # background task to a server restart.  Re-queue them now so they can
+    # reach COMPLETED without the user having to re-upload.
+    async def _recover_phase2() -> None:
+        from sqlalchemy import select as _select
+        from app.database.session import AsyncSessionLocal as _Session
+        from app.models.file import File as _File, ProcessingStatus as _PS
+        from app.services.file_processor import file_processor as _fp
+
+        async with _Session() as db:
+            rows = await db.execute(
+                _select(_File.id).where(
+                    _File.processing_status.in_([_PS.NAIVE_READY, _PS.PROCESSING])
+                )
+            )
+            ids = [r[0] for r in rows.all()]
+
+        if ids:
+            logging.getLogger(__name__).info(
+                "Phase 2 recovery: found %d file(s) needing Phase 2 → %s", len(ids), ids
+            )
+            for fid in ids:
+                try:
+                    await _fp.resume_phase2(fid)
+                except Exception as _e:
+                    logging.getLogger(__name__).error(
+                        "Phase 2 recovery failed for file_id=%d: %s", fid, _e
+                    )
+        else:
+            logging.getLogger(__name__).info("Phase 2 recovery: no stuck files found")
+
+    await _recover_phase2()
 
     yield
 

@@ -13,6 +13,7 @@ from __future__ import annotations
 import base64
 import sys
 import tempfile
+import threading
 import types
 from pathlib import Path
 from typing import Any
@@ -66,6 +67,38 @@ def _install_docling_pdf_stub() -> None:
 _install_docling_pdf_stub()
 
 
+# ---------------------------------------------------------------------------
+# DocumentConverter singleton — lazy-initialized, thread-safe
+# Avoids 3–10 s re-init cost on every upload after the first.
+# ---------------------------------------------------------------------------
+
+_converter: Any = None
+_converter_lock = threading.Lock()
+
+
+def _get_converter() -> Any:
+    """Return (or lazily create) the shared DocumentConverter instance."""
+    global _converter
+    if _converter is None:
+        with _converter_lock:
+            if _converter is None:
+                from docling.document_converter import DocumentConverter, PdfFormatOption
+                from docling.datamodel.pipeline_options import PdfPipelineOptions, EasyOcrOptions
+                from docling.datamodel.base_models import InputFormat
+                _converter = DocumentConverter(
+                    format_options={
+                        InputFormat.PDF: PdfFormatOption(
+                            pipeline_options=PdfPipelineOptions(
+                                do_ocr=True,
+                                ocr_options=EasyOcrOptions(lang=["en"]),
+                            )
+                        )
+                    }
+                )
+                logger.info("DocumentConverter initialized (singleton ready)")
+    return _converter
+
+
 # ── transformers lazy-loader nudge ────────────────────────────────────────────
 # docling.datamodel.pipeline_options_vlm_model does `from transformers import
 # StoppingCriteria` deep inside a chain triggered by importing DocumentConverter.
@@ -96,24 +129,13 @@ def _convert_with_docling(file_path: Path, image_dir: Path) -> list[dict[str, An
     Images are saved as PNG files inside `image_dir`.
     """
     try:
-        from docling.document_converter import DocumentConverter, PdfFormatOption
-        from docling.datamodel.pipeline_options import PdfPipelineOptions, EasyOcrOptions
-        from docling.datamodel.base_models import InputFormat
+        from docling.document_converter import DocumentConverter  # noqa: F401
     except ImportError:
         raise RuntimeError(
             "docling is not installed. Run: pip install 'docling>=2.5.0'"
         )
 
-    converter = DocumentConverter(
-        format_options={
-            InputFormat.PDF: PdfFormatOption(
-                pipeline_options=PdfPipelineOptions(
-                    do_ocr=True,
-                    ocr_options=EasyOcrOptions(lang=["en"]),
-                )
-            )
-        }
-    )
+    converter = _get_converter()
     result = converter.convert(str(file_path))
     doc = result.document
 

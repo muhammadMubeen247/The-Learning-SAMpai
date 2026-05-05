@@ -67,10 +67,10 @@ async def generate_deck(
 ):
     file, classroom = await _get_file_and_classroom(file_id, current_user, db)
 
-    if file.processing_status != ProcessingStatus.COMPLETED:
+    if file.processing_status not in (ProcessingStatus.NAIVE_READY, ProcessingStatus.COMPLETED):
         raise HTTPException(
             status_code=400,
-            detail="File is not fully processed yet. Please wait until processing completes.",
+            detail="File is still being processed. Please wait a moment.",
         )
 
     result = await db.execute(

@@ -63,7 +63,14 @@ _instructor_client: instructor.AsyncInstructor | None = None
 def _get_instructor_client() -> instructor.AsyncInstructor:
     global _instructor_client
     if _instructor_client is None:
-        _instructor_client = instructor.from_openai(AsyncOpenAI())
+        import httpx
+        _instructor_client = instructor.from_openai(
+            AsyncOpenAI(
+                http_client=httpx.AsyncClient(
+                    timeout=httpx.Timeout(connect=30.0, read=120.0, write=30.0, pool=5.0),
+                ),
+            )
+        )
     return _instructor_client
 
 

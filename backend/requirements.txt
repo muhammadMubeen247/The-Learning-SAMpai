@@ -36,8 +36,27 @@ lxml==6.0.2
 xlsxwriter==3.2.9
 
 # Vector Database
-chromadb==0.4.24
-chroma-hnswlib==0.7.3
+# chromadb==0.4.24 is intentionally NOT listed here.
+# It must be installed separately with --no-deps to avoid building chroma-hnswlib
+# (a C++ extension that requires MSVC on Windows):
+#   pip install --no-deps chromadb==0.4.24
+# All of chromadb's other runtime deps are listed below instead.
+grpcio>=1.58.0
+onnxruntime>=1.14.1
+opentelemetry-api>=1.2.0
+opentelemetry-sdk>=1.2.0
+opentelemetry-exporter-otlp-proto-grpc>=1.2.0
+opentelemetry-instrumentation-fastapi>=0.41b0
+pypika>=0.48.9
+overrides>=7.3.1
+mmh3>=4.0.1
+orjson>=3.9.12
+posthog>=2.4.0
+pulsar-client>=3.1.0
+kubernetes>=28.1.0
+importlib-resources
+tokenizers>=0.13.2
+build>=1.0.3
 
 # Knowledge Graph
 neo4j==5.18.0

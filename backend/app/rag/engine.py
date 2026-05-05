@@ -16,6 +16,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
+from typing import Literal
+
 from app.rag.base import (
     BaseGraphStorage,
     BaseKVStorage,
@@ -28,6 +30,7 @@ from app.rag.base import (
     QueryResult,
 )
 from app.rag.constants import (
+    BACKGROUND_MAX_ASYNC,
     DEFAULT_CHUNK_OVERLAP_TOKEN_SIZE,
     DEFAULT_CHUNK_TOKEN_SIZE,
     DEFAULT_ENTITY_TYPES,
@@ -102,8 +105,14 @@ class LightRAGEngine:
 
     # ------------------------------------------------------------------
 
-    def _make_global_config(self) -> dict[str, Any]:
-        """Assemble the global_config dict that operate.py functions expect."""
+    def _make_global_config(self, background: bool = False) -> dict[str, Any]:
+        """Assemble the global_config dict that operate.py functions expect.
+
+        Args:
+            background: When True, uses BACKGROUND_MAX_ASYNC instead of the
+                default so Phase 2 ingestion yields headroom to interactive
+                callers (chat, flashcards) in the shared OpenAI rate-limit bucket.
+        """
         return {
             # LLM / embedding
             "llm_model_func": openai_llm_func,
@@ -122,8 +131,9 @@ class LightRAGEngine:
             "max_source_ids_per_entity": DEFAULT_MAX_SOURCE_IDS_PER_ENTITY,
             "max_source_ids_per_relation": DEFAULT_MAX_SOURCE_IDS_PER_RELATION,
             "source_ids_limit_method": DEFAULT_SOURCE_IDS_LIMIT_METHOD,
-            # Concurrency
-            "llm_model_max_async": DEFAULT_MAX_ASYNC,
+            # Concurrency — background inserts use a lower limit to leave
+            # headroom for interactive foreground API calls
+            "llm_model_max_async": BACKGROUND_MAX_ASYNC if background else DEFAULT_MAX_ASYNC,
             # Workspace
             "workspace": self.workspace,
             # Add-on params (language, entity types)
@@ -229,6 +239,7 @@ class LightRAGEngine:
         file_paths: list[str] | None = None,
         split_by_character: str | None = None,
         split_by_character_only: bool = False,
+        phase: Literal["full", "phase1", "phase2"] = "full",
     ) -> None:
         """
         Chunk, embed, and index text content into the knowledge graph.
@@ -239,6 +250,12 @@ class LightRAGEngine:
                         Must match length of `content` list if provided.
             split_by_character: Optional character to split by before token chunking.
             split_by_character_only: If True, don't further split oversized character chunks.
+            phase: Processing phase.
+                - "full"   — complete pipeline (chunks + entity extraction + KG merge).
+                - "phase1" — chunks + embeddings only (enables naive-mode features).
+                - "phase2" — entity extraction + KG merge only (enables mix-mode features).
+                  For phase2, content is still required to recompute the doc_id for
+                  idempotency checks; chunks must already exist from a prior phase1 call.
         """
         if not self._initialized:
             await self.initialize()
@@ -251,9 +268,14 @@ class LightRAGEngine:
             raise ValueError("file_paths must match content length")
 
         _insert_t0 = time.time()
-        logger.info("ainsert: starting — %d document(s) for workspace=%s", len(content), self.workspace)
+        logger.info(
+            "ainsert: starting phase=%s — %d document(s) for workspace=%s",
+            phase, len(content), self.workspace,
+        )
 
-        global_config = self._make_global_config()
+        # Insert is always background work — use the lower concurrency ceiling
+        # so active chat/flashcard calls keep headroom in the rate-limit bucket.
+        global_config = self._make_global_config(background=True)
         tokenizer = global_config["tokenizer"]
 
         for doc_text, file_path in zip(content, file_paths):
@@ -264,11 +286,12 @@ class LightRAGEngine:
                 tokenizer,
                 split_by_character=split_by_character,
                 split_by_character_only=split_by_character_only,
+                phase=phase,
             )
 
         logger.info(
-            "ainsert: complete in %.2fs — %d document(s) for workspace=%s",
-            time.time() - _insert_t0, len(content), self.workspace,
+            "ainsert: complete phase=%s in %.2fs — %d document(s) for workspace=%s",
+            phase, time.time() - _insert_t0, len(content), self.workspace,
         )
 
     async def _insert_single_document(
@@ -279,117 +302,138 @@ class LightRAGEngine:
         tokenizer: Any,
         split_by_character: str | None = None,
         split_by_character_only: bool = False,
+        phase: Literal["full", "phase1", "phase2"] = "full",
     ) -> None:
-        """Full insert pipeline for a single document."""
-        # Compute deterministic doc ID
+        """Insert pipeline for a single document, optionally split into phases.
+
+        phase="phase1" — stores chunks + embeddings, sets DocStatus.CHUNKS_READY.
+        phase="phase2" — runs entity extraction + KG merge on existing chunks.
+        phase="full"   — both phases in sequence (original behaviour).
+        """
         doc_id = compute_mdhash_id(content, prefix="doc-")
         _doc_t0 = time.time()
         logger.info(
-            "_insert_single_document: START doc_id=%s file=%s content_len=%d",
-            doc_id, file_path, len(content),
-        )
-
-        # Check if already processed
-        already = await self._full_docs.get_by_id(doc_id)
-        if already is not None:
-            logger.info(f"Document already indexed: {file_path} ({doc_id})")
-            return
-
-        # Mark as processing
-        await self._doc_status.set_status(
-            doc_id,
-            DocStatus.PROCESSING,
-            file_path=file_path,
-            content_summary=content[:200],
-            content_length=len(content),
+            "_insert_single_document: START phase=%s doc_id=%s file=%s content_len=%d",
+            phase, doc_id, file_path, len(content),
         )
 
         try:
-            # 1. Store full document
-            await self._full_docs.upsert({doc_id: {"content": content, "file_path": file_path}})
+            if phase in ("full", "phase1"):
+                # ── Phase 1: chunk + embed ─────────────────────────────────
+                already = await self._full_docs.get_by_id(doc_id)
+                if already is not None and phase == "full":
+                    logger.info(f"Document already indexed: {file_path} ({doc_id})")
+                    return
 
-            # 2. Chunk
-            raw_chunks = chunking_by_token_size(
-                tokenizer,
-                content,
-                split_by_character=split_by_character,
-                split_by_character_only=split_by_character_only,
-                chunk_overlap_token_size=DEFAULT_CHUNK_OVERLAP_TOKEN_SIZE,
-                chunk_token_size=DEFAULT_CHUNK_TOKEN_SIZE,
-            )
-
-            # 3. Build chunk records
-            chunks: dict[str, dict] = {}
-            chunk_ids: list[str] = []
-            for chunk in raw_chunks:
-                chunk_content = chunk["content"]
-                chunk_id = compute_mdhash_id(chunk_content, prefix="chunk-")
-                chunks[chunk_id] = {
-                    "content": chunk_content,
-                    "tokens": chunk["tokens"],
-                    "chunk_order_index": chunk["chunk_order_index"],
-                    "full_doc_id": doc_id,
-                    "file_path": file_path,
-                }
-                chunk_ids.append(chunk_id)
-
-            logger.debug(
-                "_insert_single_document: chunking produced %d raw chunks for %s",
-                len(raw_chunks), file_path,
-            )
-
-            if not chunks:
-                logger.warning(f"No chunks generated for {file_path}")
                 await self._doc_status.set_status(
-                    doc_id, DocStatus.FAILED,
+                    doc_id, DocStatus.PROCESSING,
                     file_path=file_path,
-                    error_msg="No chunks generated",
+                    content_summary=content[:200],
+                    content_length=len(content),
                 )
-                return
 
-            # 4. Filter already-indexed chunks
-            new_chunk_ids = await self._text_chunks.filter_keys(set(chunk_ids))
-            new_chunks = {cid: chunks[cid] for cid in new_chunk_ids}
-            logger.info(
-                "_insert_single_document: %d new chunks to index (%d already exist) for %s",
-                len(new_chunks), len(chunks) - len(new_chunks), file_path,
-            )
+                await self._full_docs.upsert({doc_id: {"content": content, "file_path": file_path}})
 
-            # 5. Embed new chunks into vector store
-            if new_chunks:
-                chunk_texts = [c["content"] for c in new_chunks.values()]
-                embeddings = await global_config["embedding_func"](chunk_texts)
+                raw_chunks = chunking_by_token_size(
+                    tokenizer,
+                    content,
+                    split_by_character=split_by_character,
+                    split_by_character_only=split_by_character_only,
+                    chunk_overlap_token_size=DEFAULT_CHUNK_OVERLAP_TOKEN_SIZE,
+                    chunk_token_size=DEFAULT_CHUNK_TOKEN_SIZE,
+                )
 
-                vdb_payload: dict[str, dict] = {}
-                for i, (cid, chunk_data) in enumerate(new_chunks.items()):
-                    vdb_payload[cid] = {
-                        "content": chunk_data["content"],
-                        "file_path": file_path,
+                chunks: dict[str, dict] = {}
+                chunk_ids: list[str] = []
+                for chunk in raw_chunks:
+                    chunk_content = chunk["content"]
+                    chunk_id = compute_mdhash_id(chunk_content, prefix="chunk-")
+                    chunks[chunk_id] = {
+                        "content": chunk_content,
+                        "tokens": chunk["tokens"],
+                        "chunk_order_index": chunk["chunk_order_index"],
                         "full_doc_id": doc_id,
-                        "chunk_order_index": chunk_data["chunk_order_index"],
+                        "file_path": file_path,
                     }
+                    chunk_ids.append(chunk_id)
 
-                await self._chunks_vdb.upsert(vdb_payload)
-                await self._text_chunks.upsert(new_chunks)
+                if not chunks:
+                    logger.warning(f"No chunks generated for {file_path}")
+                    await self._doc_status.set_status(
+                        doc_id, DocStatus.FAILED,
+                        file_path=file_path, error_msg="No chunks generated",
+                    )
+                    return
+
+                new_chunk_ids = await self._text_chunks.filter_keys(set(chunk_ids))
+                new_chunks = {cid: chunks[cid] for cid in new_chunk_ids}
                 logger.info(
-                    f"Indexed {len(new_chunks)} new chunks ({len(chunks)} total) for {file_path}"
+                    "_insert_single_document: %d new chunks to index (%d already exist) for %s",
+                    len(new_chunks), len(chunks) - len(new_chunks), file_path,
                 )
-            else:
-                logger.info(f"All {len(chunks)} chunks already indexed for {file_path}")
 
-            # 6. Entity extraction (only on new chunks)
+                if new_chunks:
+                    vdb_payload: dict[str, dict] = {}
+                    for cid, chunk_data in new_chunks.items():
+                        vdb_payload[cid] = {
+                            "content": chunk_data["content"],
+                            "file_path": file_path,
+                            "full_doc_id": doc_id,
+                            "chunk_order_index": chunk_data["chunk_order_index"],
+                        }
+                    await self._chunks_vdb.upsert(vdb_payload)
+                    await self._text_chunks.upsert(new_chunks)
+                    logger.info(
+                        "Indexed %d new chunks (%d total) for %s",
+                        len(new_chunks), len(chunks), file_path,
+                    )
+
+                if phase == "phase1":
+                    # Signal that naive-mode features are now usable.
+                    await self._doc_status.set_status(
+                        doc_id, DocStatus.CHUNKS_READY,
+                        file_path=file_path,
+                        content_summary=content[:200],
+                        content_length=len(content),
+                        chunks_count=len(chunks),
+                        chunks_list=list(chunks.keys()),
+                    )
+                    logger.info(
+                        "_insert_single_document: phase1 complete in %.2fs — %s",
+                        time.time() - _doc_t0, file_path,
+                    )
+                    return
+
+            # ── Phase 2: entity extraction + KG merge ─────────────────────
+            # Retrieve new_chunks from KV if we are resuming from a phase1 call.
+            if phase == "phase2":
+                doc_record = await self._doc_status.get_doc_by_file_path(file_path)
+                stored_chunk_ids: list[str] = (doc_record or {}).get("chunks_list") or []
+                if not stored_chunk_ids:
+                    # Fallback: recompute chunk IDs from content
+                    raw_chunks_p2 = chunking_by_token_size(
+                        tokenizer, content,
+                        split_by_character=split_by_character,
+                        split_by_character_only=split_by_character_only,
+                        chunk_overlap_token_size=DEFAULT_CHUNK_OVERLAP_TOKEN_SIZE,
+                        chunk_token_size=DEFAULT_CHUNK_TOKEN_SIZE,
+                    )
+                    stored_chunk_ids = [
+                        compute_mdhash_id(c["content"], prefix="chunk-") for c in raw_chunks_p2
+                    ]
+                new_chunks = {}
+                if stored_chunk_ids:
+                    rows = await self._text_chunks.get_by_ids(stored_chunk_ids)
+                    new_chunks = {r["id"]: r for r in rows if r}
+
             if new_chunks:
                 logger.info(
-                    "_insert_single_document: starting entity extraction on %d new chunks for %s",
+                    "_insert_single_document: entity extraction on %d chunks for %s",
                     len(new_chunks), file_path,
                 )
                 chunk_results = await extract_entities(
-                    new_chunks,
-                    global_config,
-                    llm_response_cache=self._llm_cache,
+                    new_chunks, global_config, llm_response_cache=self._llm_cache,
                 )
-
-                # 7. Merge nodes and edges into graph + vector stores
                 await merge_nodes_and_edges(
                     chunk_results=chunk_results,
                     knowledge_graph_inst=self._graph,
@@ -405,28 +449,34 @@ class LightRAGEngine:
                     file_path=file_path,
                 )
 
-            # 8. Mark as processed
+            # Resolve chunks/chunk_ids for the final status write
+            if phase == "phase2":
+                final_chunks_list = stored_chunk_ids
+                final_chunks_count = len(stored_chunk_ids)
+            else:
+                final_chunks_list = list(chunks.keys())  # type: ignore[possibly-undefined]
+                final_chunks_count = len(chunks)         # type: ignore[possibly-undefined]
+
             await self._doc_status.set_status(
-                doc_id,
-                DocStatus.PROCESSED,
+                doc_id, DocStatus.PROCESSED,
                 file_path=file_path,
                 content_summary=content[:200],
                 content_length=len(content),
-                chunks_count=len(chunks),
-                chunks_list=list(chunks.keys()),
+                chunks_count=final_chunks_count,
+                chunks_list=final_chunks_list,
             )
             logger.info(
-                "_insert_single_document: complete in %.2fs — %s (%s)",
-                time.time() - _doc_t0, file_path, doc_id,
+                "_insert_single_document: complete phase=%s in %.2fs — %s (%s)",
+                phase, time.time() - _doc_t0, file_path, doc_id,
             )
 
         except Exception as e:
-            logger.error(f"Document processing failed for {file_path}: {e}", exc_info=True)
+            logger.error(
+                "Document processing failed phase=%s for %s: %s", phase, file_path, e,
+                exc_info=True,
+            )
             await self._doc_status.set_status(
-                doc_id,
-                DocStatus.FAILED,
-                file_path=file_path,
-                error_msg=str(e),
+                doc_id, DocStatus.FAILED, file_path=file_path, error_msg=str(e),
             )
             raise
 

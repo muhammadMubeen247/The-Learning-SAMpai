@@ -41,13 +41,13 @@ export default function FilesSection({ classroomId, folderId, isOwner, onFileUpl
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadedFileId, setUploadedFileId] = useState<number | null>(null)
-  const [processingStatus, setProcessingStatus] = useState<"pending" | "processing" | "completed" | "failed">("pending")
+  const [processingStatus, setProcessingStatus] = useState<"pending" | "processing" | "naive_ready" | "completed" | "failed">("pending")
   const [processingProgress, setProcessingProgress] = useState(0)
   const [uploadingFileName, setUploadingFileName] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   // Track processing status and completion tick visibility per file
-  const [fileProcessingStatus, setFileProcessingStatus] = useState<Map<number, "pending" | "processing" | "completed" | "failed">>(new Map())
+  const [fileProcessingStatus, setFileProcessingStatus] = useState<Map<number, "pending" | "processing" | "naive_ready" | "completed" | "failed">>(new Map())
   const [fileShowTick, setFileShowTick] = useState<Map<number, boolean>>(new Map())
 
   const fileColor = theme === "dark" ? "#93C5FD" : "#38BDF8"
@@ -74,13 +74,16 @@ export default function FilesSection({ classroomId, folderId, isOwner, onFileUpl
       // Track processing status for all files
       const statusMap = new Map<number, "pending" | "processing" | "completed" | "failed">()
       res.data.forEach((file) => {
-        statusMap.set(file.id, file.processing_status as "pending" | "processing" | "completed" | "failed")
+        statusMap.set(file.id, file.processing_status as "pending" | "processing" | "naive_ready" | "completed" | "failed")
       })
       setFileProcessingStatus(statusMap)
       
       // Start polling for any files that are still processing (only if not already polling for a new upload)
       const processingFiles = res.data.filter(
-        (file) => file.processing_status === "pending" || file.processing_status === "processing"
+        (file) =>
+          file.processing_status === "pending" ||
+          file.processing_status === "processing" ||
+          file.processing_status === "naive_ready"
       )
       if (processingFiles.length > 0 && !uploadedFileId) {
         // Poll for all processing files
@@ -326,7 +329,10 @@ export default function FilesSection({ classroomId, folderId, isOwner, onFileUpl
         if (status === "pending") {
           setProcessingProgress(20)
         } else if (status === "processing") {
-          setProcessingProgress(60)
+          setProcessingProgress(50)
+        } else if (status === "naive_ready") {
+          // Phase 1 done — chat/flashcards usable; Phase 2 (KG) still running in background
+          setProcessingProgress(70)
         } else if (status === "completed") {
           setProcessingProgress(100)
           // Stop polling
@@ -618,10 +624,23 @@ export default function FilesSection({ classroomId, folderId, isOwner, onFileUpl
                           <div className="flex items-center gap-2 text-sm text-green-500">
                             <span>✓ File uploaded successfully!</span>
                           </div>
-                          <LoadingOrb 
+                          <LoadingOrb
                             progress={processingProgress}
                             size="sm"
                             message="Processing file..."
+                            showProgress={true}
+                          />
+                        </div>
+                      )}
+                      {uploadProgress >= 100 && processingStatus === "naive_ready" && (
+                        <div className="flex flex-col items-center justify-center py-4 space-y-2">
+                          <div className="flex items-center gap-2 text-sm text-green-500">
+                            <span>✓ Chat ready! Full analysis still loading...</span>
+                          </div>
+                          <LoadingOrb
+                            progress={processingProgress}
+                            size="sm"
+                            message="Building knowledge graph..."
                             showProgress={true}
                           />
                         </div>

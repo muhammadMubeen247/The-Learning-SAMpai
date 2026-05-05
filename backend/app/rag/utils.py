@@ -503,6 +503,28 @@ def merge_file_paths(existing: str | None, new_paths: list[str], max_paths: int 
 # OpenAI-specific wrappers (FYP implementations)
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# OpenAI client singleton — one TCP+TLS session reused across all API calls
+# ---------------------------------------------------------------------------
+
+_openai_client: Any = None
+
+
+def _get_openai_client() -> Any:
+    """Return (or lazily create) the module-level AsyncOpenAI client."""
+    global _openai_client
+    if _openai_client is None:
+        import httpx
+        from openai import AsyncOpenAI
+        _openai_client = AsyncOpenAI(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            http_client=httpx.AsyncClient(
+                timeout=httpx.Timeout(connect=30.0, read=120.0, write=30.0, pool=5.0),
+            ),
+        )
+    return _openai_client
+
+
 @wrap_embedding_func_with_attrs(
     embedding_dim=1536,
     max_token_size=8191,
@@ -513,8 +535,7 @@ async def openai_embedding_func(texts: list[str]) -> np.ndarray:
     Async embedding function using OpenAI text-embedding-3-small.
     Returns a (N, 1536) numpy array.
     """
-    from openai import AsyncOpenAI
-    client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    client = _get_openai_client()
 
     # Batch calls: OpenAI allows up to 2048 inputs per call
     batch_size = 256
@@ -549,8 +570,7 @@ async def openai_llm_func(
     Async LLM function using OpenAI GPT-4o-mini.
     Matches LightRAG's expected llm_model_func signature.
     """
-    from openai import AsyncOpenAI
-    client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    client = _get_openai_client()
 
     llm_model = model or os.getenv("LLM_MODEL", "gpt-4o-mini")
 
@@ -590,8 +610,7 @@ async def openai_vision_func(
     Async vision function using GPT-4o for image analysis.
     image_data: base64-encoded image bytes (no data URI prefix).
     """
-    from openai import AsyncOpenAI
-    client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    client = _get_openai_client()
 
     vision_model = os.getenv("VISION_MODEL", "gpt-4o")
 

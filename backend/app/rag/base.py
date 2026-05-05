@@ -366,6 +366,7 @@ class DocStatus(str, Enum):
     PENDING = "pending"
     PROCESSING = "processing"
     PREPROCESSED = "preprocessed"
+    CHUNKS_READY = "chunks_ready"   # Phase 1 done — naive features usable
     PROCESSED = "processed"
     FAILED = "failed"
 

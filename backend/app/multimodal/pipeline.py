@@ -18,7 +18,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from app.multimodal.parser import parse_bytes, separate_content
 from app.multimodal.processors import (
@@ -86,6 +86,7 @@ class MultimodalPipeline:
         file_path: str,
         engine: LightRAGEngine,
         output_dir: str | None = None,
+        phase: Literal["full", "phase1", "phase2"] = "full",
     ) -> ProcessingResult:
         """
         Full document processing pipeline.
@@ -161,18 +162,32 @@ class MultimodalPipeline:
                 filename, len(text_content), len(modal_items), modal_type_summary,
             )
 
-            # ── Step 3: Text pipeline ────────────────────────────────────────
-            # split_by_character="\n\n" honours slide/paragraph boundaries before
-            # falling back to token-based splitting — critical for PPTX.
-            if text_content.strip():
+            # ── Steps 3 + 4: Text and modal pipelines run concurrently ─────────
+            # Text pipeline (chunk + embed + entity extraction + KG merge) and
+            # modal pipeline (OCR pre-pass + vision API + per-modal entity extraction)
+            # are independent after Docling parsing — start them together.
+            #
+            # Storage collision analysis (all safe):
+            #   chunks_vdb  — different deterministic IDs, Chroma upsert idempotent
+            #   text_chunks — different keys, asyncpg row-level locking
+            #   entities_vdb / relationships_vdb / Neo4j — merge logic handles
+            #     concurrent writes via read-modify-write + idempotent MERGE
+            #
+            # Temp directory (_managed_tmp) is cleaned up in the finally block
+            # AFTER asyncio.gather returns, so image files stay valid for both
+            # pipelines' full duration.
+
+            async def _run_text_pipeline() -> None:
+                if not text_content.strip():
+                    return
                 _text_t0 = time.time()
                 logger.info(
-                    "MultimodalPipeline: '%s' text pipeline start (%d chars)",
-                    filename, len(text_content),
+                    "MultimodalPipeline: '%s' text pipeline start phase=%s (%d chars)",
+                    filename, phase, len(text_content),
                 )
                 try:
                     await engine.ainsert(text_content, file_paths=[file_path],
-                                         split_by_character="\n\n")
+                                         split_by_character="\n\n", phase=phase)
                     logger.info(
                         "MultimodalPipeline: '%s' text pipeline done in %.2fs",
                         filename, time.time() - _text_t0,
@@ -184,36 +199,45 @@ class MultimodalPipeline:
                     )
                     result.errors.append(f"text insert error: {e}")
 
-            # ── Step 4: Modal pipeline ───────────────────────────────────────
-            # Image files in output_dir are still present here — cleanup happens
-            # in the finally block AFTER this await returns.
+            if phase == "phase1":
+                # Phase 1: chunk+embed text only — modal pipeline runs in Phase 2
+                await _run_text_pipeline()
+            else:
+                # Phase 2 / full: entity extraction + modal pipeline run concurrently.
+                # Image dedup runs here (outside the coroutine) so the deduplicated
+                # list is available to _run_modal_pipeline's setup.
 
-            # Deduplicate identical images by raw content hash.
-            # LLM cache already deduplicates vision API calls, but without this
-            # entity extraction LLM calls + KV/ChromaDB/Neo4j writes still run
-            # for every occurrence of a repeated image (e.g. logo on every slide).
-            _seen_img_hashes: set[str] = set()
-            _deduped: list[dict] = []
-            for _item in modal_items:
-                if _item.get("type") == "image":
-                    _img_path = _item.get("img_path", "")
-                    if _img_path:
-                        try:
-                            _h = hashlib.md5(Path(_img_path).read_bytes()).hexdigest()
-                            if _h in _seen_img_hashes:
-                                logger.debug(
-                                    "MultimodalPipeline: '%s' duplicate image skipped: %s",
-                                    filename, _img_path,
-                                )
-                                result.modal_items_total -= 1
-                                continue
-                            _seen_img_hashes.add(_h)
-                        except Exception:
-                            pass  # unreadable file — pass through to processor
-                _deduped.append(_item)
-            modal_items = _deduped
+                # ── Modal pipeline coroutine (launched in gather below) ──────────
+                # Image files in output_dir are still present — cleanup is in finally.
 
-            if not self.skip_modals and modal_items:
+                # Deduplicate identical images by raw content hash before building
+                # the modal pipeline. Done here (not inside the coroutine) so the
+                # updated modal_items list is available to both pipelines' setup.
+                _seen_img_hashes: set[str] = set()
+                _deduped: list[dict] = []
+                for _item in modal_items:
+                    if _item.get("type") == "image":
+                        _img_path = _item.get("img_path", "")
+                        if _img_path:
+                            try:
+                                _h = hashlib.md5(Path(_img_path).read_bytes()).hexdigest()
+                                if _h in _seen_img_hashes:
+                                    logger.debug(
+                                        "MultimodalPipeline: '%s' duplicate image skipped: %s",
+                                        filename, _img_path,
+                                    )
+                                    result.modal_items_total -= 1
+                                    continue
+                                _seen_img_hashes.add(_h)
+                            except Exception:
+                                pass  # unreadable file — pass through to processor
+                    _deduped.append(_item)
+                modal_items = _deduped
+
+            async def _run_modal_pipeline() -> None:
+                if self.skip_modals or not modal_items:
+                    return
+
                 # OCR pre-pass: enrich image items with extracted text + text-only flag.
                 # Runs concurrently in thread pool — no API rate limit applies to local OCR.
                 # Results are stored in-place on each item dict and read by ImageModalProcessor:
@@ -238,7 +262,7 @@ class MultimodalPipeline:
                     )
 
                 doc_id = compute_mdhash_id(text_content or filename, prefix="doc-")
-                global_config = engine._make_global_config()
+                global_config = engine._make_global_config(background=True)
 
                 shared = dict(
                     text_chunks_db=engine._text_chunks,
@@ -307,6 +331,13 @@ class MultimodalPipeline:
                             result.modal_items_failed += 1
                             if err:
                                 result.errors.append(err)
+
+            if phase != "phase1":
+                # Phase 2 / full: text entity extraction + modal pipeline concurrently.
+                # They write to disjoint storage namespaces — no write conflicts.
+                # See optimization-plan.md Fix 6 for the full collision analysis.
+                # (Phase 1 already awaited _run_text_pipeline above.)
+                await asyncio.gather(_run_text_pipeline(), _run_modal_pipeline())
 
             logger.info(
                 "MultimodalPipeline: DONE '%s' in %.2fs — text=%d chars, "

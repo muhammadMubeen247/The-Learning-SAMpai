@@ -172,13 +172,13 @@ class GroupChatAgent:
             logger.warning(f"[respond] file {file_id} not found")
             return
 
-        if file.processing_status != ProcessingStatus.COMPLETED:
+        if file.processing_status not in (ProcessingStatus.NAIVE_READY, ProcessingStatus.COMPLETED):
             await self._send_system_message(
                 db,
                 thread_id=thread_id,
                 content=(
                     "SAMpai is still indexing this file. "
-                    "Please try again once processing is complete."
+                    "Please try again in a moment."
                 ),
                 reply_to_id=message_id,
             )

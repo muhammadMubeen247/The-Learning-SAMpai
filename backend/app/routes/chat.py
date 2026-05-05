@@ -72,7 +72,7 @@ async def ask_question(
 
     file, classroom = await _get_file_and_classroom(file_id, current_user, db)
 
-    if file.processing_status.value != "completed":
+    if file.processing_status not in (ProcessingStatus.NAIVE_READY, ProcessingStatus.COMPLETED):
         raise HTTPException(
             status_code=400,
             detail=f"File is still being processed. Status: {file.processing_status.value}",

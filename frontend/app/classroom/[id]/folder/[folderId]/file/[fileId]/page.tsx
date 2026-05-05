@@ -39,7 +39,7 @@ type FileType = {
   file_key: string
   file_type: string | null
   file_size: number | null
-  processing_status: "pending" | "processing" | "completed" | "failed"
+  processing_status: "pending" | "processing" | "naive_ready" | "completed" | "failed"
   description: string | null
   folder_id: number
   uploaded_at: string
@@ -167,12 +167,12 @@ export default function FilePage() {
         setFile(f)
         setFiles(filesRes.data)
 
-        if (f.processing_status === "completed") {
+        if (f.processing_status === "completed" || f.processing_status === "naive_ready") {
           await fetchHistory()
         }
 
-        // Auto-poll if file is still processing
-        if (f.processing_status === "pending" || f.processing_status === "processing") {
+        // Keep polling on naive_ready too — Phase 2 still running in background
+        if (f.processing_status === "pending" || f.processing_status === "processing" || f.processing_status === "naive_ready") {
           startPolling()
         }
       } catch (err: any) {
@@ -195,7 +195,7 @@ export default function FilePage() {
   // ── Chat ──────────────────────────────────────────────────────────────────────
 
   const handleAsk = async () => {
-    if (!question.trim() || isAsking || !isCompleted) return
+    if (!question.trim() || isAsking || !canChat) return
     const q = question.trim()
     setQuestion("")
     setChatError(null)
@@ -267,9 +267,14 @@ export default function FilePage() {
   const summary = file?.description ?? null
   const status = file?.processing_status ?? "pending"
   const isCompleted = status === "completed"
+  const isNaiveReady = status === "naive_ready"
   const isFailed = status === "failed"
   const isInProgress = status === "pending" || status === "processing"
-  const canChat = isCompleted
+  // Phase 1 done → chat/flashcards/group-chat usable
+  const naiveReady = isNaiveReady || isCompleted
+  // Phase 2 done → quiz/mindmap usable
+  const fullReady = isCompleted
+  const canChat = naiveReady
 
   // ── Status badge ──────────────────────────────────────────────────────────────
 
@@ -277,6 +282,11 @@ export default function FilePage() {
     if (isCompleted) return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
         <CheckCircle2 className="h-3.5 w-3.5" /> Ready
+      </span>
+    )
+    if (isNaiveReady) return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 border border-blue-500/30 px-3 py-1 text-xs font-medium text-blue-600 dark:text-blue-400">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Chat Ready
       </span>
     )
     if (isFailed) return (
@@ -395,7 +405,7 @@ export default function FilePage() {
               </p>
               {summary ? (
                 <p className="text-sm text-foreground leading-relaxed">{summary}</p>
-              ) : isCompleted ? (
+              ) : (isCompleted || isNaiveReady) ? (
                 <p className="text-sm text-muted-foreground italic">No summary available for this document.</p>
               ) : isFailed ? (
                 <p className="text-sm text-destructive italic">Processing failed. Try re-uploading the file.</p>
@@ -411,9 +421,21 @@ export default function FilePage() {
             <Tabs defaultValue="chat" className="flex-1 flex flex-col min-h-0">
               <TabsList className="self-start mx-0 mb-1">
                 <TabsTrigger value="chat">Chat</TabsTrigger>
-                <TabsTrigger value="quiz">Quiz</TabsTrigger>
+                <TabsTrigger value="quiz" disabled={!fullReady}
+                  title={!fullReady ? "Quiz becomes available once full document analysis finishes." : undefined}>
+                  <span className="flex items-center gap-1.5">
+                    Quiz
+                    {isNaiveReady && <Loader2 className="h-3 w-3 animate-spin opacity-50" />}
+                  </span>
+                </TabsTrigger>
                 <TabsTrigger value="flashcards">Flashcards</TabsTrigger>
-                <TabsTrigger value="mindmap">Mindmap</TabsTrigger>
+                <TabsTrigger value="mindmap" disabled={!fullReady}
+                  title={!fullReady ? "Mindmap becomes available once full document analysis finishes." : undefined}>
+                  <span className="flex items-center gap-1.5">
+                    Mindmap
+                    {isNaiveReady && <Loader2 className="h-3 w-3 animate-spin opacity-50" />}
+                  </span>
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="chat" className="flex-1 flex flex-col min-h-0 mt-0">
@@ -516,19 +538,19 @@ export default function FilePage() {
 
               <TabsContent value="quiz" className="flex-1 flex flex-col min-h-0 mt-0">
                 <div className="flex-1 flex flex-col min-h-0 rounded-xl border border-border bg-card/50 backdrop-blur-sm overflow-hidden">
-                  <QuizPanel fileId={Number(fileId)} canQuiz={canChat} />
+                  <QuizPanel fileId={Number(fileId)} canQuiz={fullReady} />
                 </div>
               </TabsContent>
 
               <TabsContent value="flashcards" className="flex-1 flex flex-col min-h-0 mt-0">
                 <div className="flex-1 flex flex-col min-h-0 rounded-xl border border-border bg-card/50 backdrop-blur-sm overflow-hidden">
-                  <FlashcardPanel fileId={Number(fileId)} canFlashcard={canChat} />
+                  <FlashcardPanel fileId={Number(fileId)} canFlashcard={naiveReady} />
                 </div>
               </TabsContent>
 
               <TabsContent value="mindmap" className="flex-1 flex flex-col min-h-0 mt-0">
                 <div className="flex-1 rounded-xl border border-border bg-card/50 backdrop-blur-sm overflow-hidden" style={{ height: '100%' }}>
-                  {canChat ? (
+                  {fullReady ? (
                     <MindmapShell
                       fileId={Number(fileId)}
                       classroomId={classroomId}
@@ -536,7 +558,7 @@ export default function FilePage() {
                     />
                   ) : (
                     <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-                      Mindmap will be available once the document finishes processing.
+                      Mindmap will be available once full document analysis finishes.
                     </div>
                   )}
                 </div>

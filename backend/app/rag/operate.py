@@ -40,6 +40,7 @@ from app.rag.constants import (
     DEFAULT_RELATED_CHUNK_NUMBER,
     DEFAULT_SUMMARY_LANGUAGE,
     GRAPH_FIELD_SEP,
+    MIN_ENTITY_EXTRACT_TOKENS,
     SOURCE_IDS_LIMIT_METHOD_KEEP,
     SOURCE_IDS_LIMIT_METHOD_FIFO,
 )
@@ -472,6 +473,18 @@ async def extract_entities(
         _chunk_t0 = time.time()
         content = chunk_dp["content"]
         file_path = chunk_dp.get("file_path", "unknown_source")
+
+        # Skip LLM extraction for trivially short chunks (slide titles, lone bullet
+        # headings). They are already stored in chunks_vdb for vector retrieval.
+        chunk_tokens = chunk_dp.get("tokens", 0)
+        if chunk_tokens < MIN_ENTITY_EXTRACT_TOKENS:
+            logger.debug(
+                "extract_entities: chunk %s skipped (tokens=%d < min=%d)",
+                chunk_key[:16], chunk_tokens, MIN_ENTITY_EXTRACT_TOKENS,
+            )
+            processed_chunks += 1
+            return {}, {}
+
         logger.debug("extract_entities: chunk %s start (file=%s)", chunk_key[:16], file_path)
 
         system_prompt = PROMPTS["entity_extraction_system_prompt"].format(**context_base)
@@ -610,7 +623,7 @@ async def _merge_nodes_then_upsert(
     global_config: dict,
     llm_response_cache: BaseKVStorage | None = None,
     entity_chunks_storage: BaseKVStorage | None = None,
-) -> dict | None:
+) -> tuple[dict | None, dict]:
     """Merge entity data from multiple chunks, upsert to graph + vector DB."""
     already_entity_types: list[str] = []
     already_source_ids: list[str] = []
@@ -716,10 +729,13 @@ async def _merge_nodes_then_upsert(
     await knowledge_graph_inst.upsert_node(entity_name, node_data=node_data)
     node_data["entity_name"] = entity_name
 
+    # Build the VDB payload but do NOT upsert yet — the caller batches all
+    # entity payloads into a single embedding API call after Phase 1 completes.
+    entity_vdb_payload: dict = {}
     if entity_vdb is not None:
         vdb_id = compute_mdhash_id(entity_name, prefix="ent-")
         vdb_content = f"{entity_name}\n{description}"
-        vdb_payload = {
+        entity_vdb_payload = {
             vdb_id: {
                 "entity_name": entity_name,
                 "entity_type": entity_type,
@@ -728,17 +744,12 @@ async def _merge_nodes_then_upsert(
                 "file_path": file_path,
             }
         }
-        await safe_vdb_operation_with_exception(
-            operation=lambda p=vdb_payload: entity_vdb.upsert(p),
-            operation_name="entity_upsert",
-            entity_name=entity_name,
-        )
 
     if llm_was_used:
         logger.info(f"LLMmrg: `{entity_name}`")
     else:
         logger.debug(f"Merged: `{entity_name}`")
-    return node_data
+    return node_data, entity_vdb_payload
 
 
 async def _merge_edges_then_upsert(
@@ -753,10 +764,10 @@ async def _merge_edges_then_upsert(
     added_entities: list | None = None,
     relation_chunks_storage: BaseKVStorage | None = None,
     entity_chunks_storage: BaseKVStorage | None = None,
-) -> dict | None:
+) -> tuple[dict | None, dict, dict]:
     """Merge relationship data from multiple chunks, upsert to graph + vector DB."""
     if src_id == tgt_id:
-        return None
+        return None, {}, {}
 
     already_weights: list[float] = []
     already_source_ids: list[str] = []
@@ -849,7 +860,9 @@ async def _merge_edges_then_upsert(
 
     created_at = int(time.time())
 
-    # Ensure both endpoint nodes exist
+    # Ensure both endpoint nodes exist; collect any new entity VDB payloads for
+    # batching — do NOT upsert inline.
+    added_entity_vdb_payloads: dict = {}
     for need_id in [src_id, tgt_id]:
         existing_node = await knowledge_graph_inst.get_node(need_id)
         if existing_node is None:
@@ -868,20 +881,13 @@ async def _merge_edges_then_upsert(
                 )
             if entity_vdb is not None:
                 vdb_id = compute_mdhash_id(need_id, prefix="ent-")
-                vdb_payload = {
-                    vdb_id: {
-                        "content": f"{need_id}\n{description}",
-                        "entity_name": need_id,
-                        "source_id": source_id,
-                        "entity_type": "UNKNOWN",
-                        "file_path": file_path,
-                    }
+                added_entity_vdb_payloads[vdb_id] = {
+                    "content": f"{need_id}\n{description}",
+                    "entity_name": need_id,
+                    "source_id": source_id,
+                    "entity_type": "UNKNOWN",
+                    "file_path": file_path,
                 }
-                await safe_vdb_operation_with_exception(
-                    operation=lambda p=vdb_payload: entity_vdb.upsert(p),
-                    operation_name="added_entity_upsert",
-                    entity_name=need_id,
-                )
             if added_entities is not None:
                 added_entities.append({"entity_name": need_id, "entity_type": "UNKNOWN"})
 
@@ -898,8 +904,10 @@ async def _merge_edges_then_upsert(
         ),
     )
 
-    # VDB: sort src/tgt alphabetically for stable ID
+    # Build rel VDB payload but do NOT upsert yet — caller batches all relation
+    # payloads into a single embedding API call after Phase 2 completes.
     sorted_src, sorted_tgt = (src_id, tgt_id) if src_id <= tgt_id else (tgt_id, src_id)
+    rel_vdb_payload: dict = {}
     if relationships_vdb is not None:
         rel_vdb_id = compute_mdhash_id(sorted_src + sorted_tgt, prefix="rel-")
         rel_vdb_id_rev = compute_mdhash_id(sorted_tgt + sorted_src, prefix="rel-")
@@ -911,7 +919,7 @@ async def _merge_edges_then_upsert(
                 src_id, tgt_id, vdb_del_exc,
             )
         rel_content = f"{keywords}\t{sorted_src}\n{sorted_tgt}\n{description}"
-        vdb_payload = {
+        rel_vdb_payload = {
             rel_vdb_id: {
                 "src_id": sorted_src,
                 "tgt_id": sorted_tgt,
@@ -923,18 +931,13 @@ async def _merge_edges_then_upsert(
                 "file_path": file_path,
             }
         }
-        await safe_vdb_operation_with_exception(
-            operation=lambda p=vdb_payload: relationships_vdb.upsert(p),
-            operation_name="relationship_upsert",
-            entity_name=f"{sorted_src}-{sorted_tgt}",
-        )
 
     if llm_was_used:
         logger.info(f"LLMmrg: `{src_id}`~`{tgt_id}`")
     else:
         logger.debug(f"Merged: `{src_id}`~`{tgt_id}`")
 
-    return dict(
+    edge_data = dict(
         src_id=src_id,
         tgt_id=tgt_id,
         description=description,
@@ -943,6 +946,7 @@ async def _merge_edges_then_upsert(
         file_path=file_path,
         weight=weight,
     )
+    return edge_data, rel_vdb_payload, added_entity_vdb_payloads
 
 
 # ---------------------------------------------------------------------------
@@ -992,6 +996,7 @@ async def merge_nodes_and_edges(
 
     # ---- Phase 1: entities ----
     processed_entities: list[dict] = []
+    all_entity_vdb_payloads: dict = {}
 
     async def _process_entity(ename: str, entities: list[dict]):
         async with semaphore:
@@ -1023,9 +1028,11 @@ async def merge_nodes_and_edges(
                             "merge entities: additional task failure suppressed: %s", exc
                         )
                 else:
-                    result = task.result()
-                    if result:
-                        processed_entities.append(result)
+                    node_data, entity_vdb_payload = task.result()
+                    if node_data:
+                        processed_entities.append(node_data)
+                    if entity_vdb_payload:
+                        all_entity_vdb_payloads.update(entity_vdb_payload)
             except Exception as e:
                 if first_exc is None:
                     first_exc = e
@@ -1035,6 +1042,19 @@ async def merge_nodes_and_edges(
             await asyncio.wait(pending)
         if first_exc is not None:
             raise first_exc
+
+        # Batched entity embedding — one API call for all entities in this merge pass
+        if all_entity_vdb_payloads and entity_vdb is not None:
+            await safe_vdb_operation_with_exception(
+                operation=lambda p=all_entity_vdb_payloads: entity_vdb.upsert(p),
+                operation_name="entity_batch_upsert",
+                entity_name=f"batch({len(all_entity_vdb_payloads)})",
+            )
+            logger.debug(
+                "merge_nodes_and_edges: batched entity VDB upsert — %d items",
+                len(all_entity_vdb_payloads),
+            )
+
         logger.info(
             "merge_nodes_and_edges: Phase 1 done — %d entities processed in %.2fs",
             len(processed_entities), time.time() - _merge_t0,
@@ -1044,11 +1064,13 @@ async def merge_nodes_and_edges(
     # ---- Phase 2: relationships ----
     processed_edges: list[dict] = []
     all_added_entities: list[dict] = []
+    all_rel_vdb_payloads: dict = {}
+    all_added_entity_vdb_payloads: dict = {}
 
     async def _process_edge(edge_key: tuple, edges: list[dict]):
         async with semaphore:
             added: list[dict] = []
-            edge_data = await _merge_edges_then_upsert(
+            edge_data, rel_vdb_payload, added_ent_vdb_payloads = await _merge_edges_then_upsert(
                 edge_key[0],
                 edge_key[1],
                 edges,
@@ -1061,7 +1083,7 @@ async def merge_nodes_and_edges(
                 relation_chunks_storage,
                 entity_chunks_storage,
             )
-            return edge_data, added
+            return edge_data, added, rel_vdb_payload, added_ent_vdb_payloads
 
     edge_tasks = [
         asyncio.create_task(_process_edge(ekey, edges))
@@ -1081,10 +1103,14 @@ async def merge_nodes_and_edges(
                             "merge edges: additional task failure suppressed: %s", exc
                         )
                 else:
-                    edge_data, added = task.result()
+                    edge_data, added, rel_vdb_payload, added_ent_vdb_payloads = task.result()
                     if edge_data:
                         processed_edges.append(edge_data)
                     all_added_entities.extend(added)
+                    if rel_vdb_payload:
+                        all_rel_vdb_payloads.update(rel_vdb_payload)
+                    if added_ent_vdb_payloads:
+                        all_added_entity_vdb_payloads.update(added_ent_vdb_payloads)
             except Exception as e:
                 if first_exc is None:
                     first_exc = e
@@ -1094,6 +1120,31 @@ async def merge_nodes_and_edges(
             await asyncio.wait(pending)
         if first_exc is not None:
             raise first_exc
+
+        # Batched relation embedding — one API call for all relations in this merge pass
+        if all_rel_vdb_payloads and relationships_vdb is not None:
+            await safe_vdb_operation_with_exception(
+                operation=lambda p=all_rel_vdb_payloads: relationships_vdb.upsert(p),
+                operation_name="relation_batch_upsert",
+                entity_name=f"batch({len(all_rel_vdb_payloads)})",
+            )
+            logger.debug(
+                "merge_nodes_and_edges: batched relation VDB upsert — %d items",
+                len(all_rel_vdb_payloads),
+            )
+
+        # Batch any entity VDB entries added implicitly by the edge phase
+        if all_added_entity_vdb_payloads and entity_vdb is not None:
+            await safe_vdb_operation_with_exception(
+                operation=lambda p=all_added_entity_vdb_payloads: entity_vdb.upsert(p),
+                operation_name="added_entity_batch_upsert",
+                entity_name=f"batch({len(all_added_entity_vdb_payloads)})",
+            )
+            logger.debug(
+                "merge_nodes_and_edges: batched added-entity VDB upsert — %d items",
+                len(all_added_entity_vdb_payloads),
+            )
+
         logger.info(
             "merge_nodes_and_edges: Phase 2 done — %d edges processed, "
             "%d entity additions from edges, total elapsed %.2fs",

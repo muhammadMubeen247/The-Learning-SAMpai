@@ -75,6 +75,17 @@ DEFAULT_TEMPERATURE = 0.2  # Lower than LightRAG default for more deterministic 
 DEFAULT_MAX_ASYNC = 8             # was 4 — safe for OpenAI standard tier; 2× faster extraction queuing
 DEFAULT_MAX_PARALLEL_INSERT = 2
 
+# Tiered concurrency for foreground (interactive) vs background (Phase 2 ingestion) paths.
+# Phase 2 uses the lower value so live chat/flashcard calls always have headroom in the
+# shared OpenAI rate-limit bucket.
+FOREGROUND_MAX_ASYNC = 8
+BACKGROUND_MAX_ASYNC = 4
+
+# Minimum chunk token count to warrant an LLM entity-extraction call.
+# Chunks below this threshold (lone slide titles, bullet headings) are still stored
+# in chunks_vdb and text_chunks KV for vector retrieval — only the LLM call is skipped.
+MIN_ENTITY_EXTRACT_TOKENS = 30
+
 # Embedding configuration
 DEFAULT_EMBEDDING_FUNC_MAX_ASYNC = 16  # was 8 — embeddings are cheap/fast, higher concurrency is fine
 DEFAULT_EMBEDDING_BATCH_NUM = 50

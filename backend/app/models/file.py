@@ -8,6 +8,7 @@ class ProcessingStatus(str, enum.Enum):
     """Enum for file processing status"""
     PENDING = "pending"
     PROCESSING = "processing"
+    NAIVE_READY = "naive_ready"   # chunks indexed — chat/flashcards usable; KG still building
     COMPLETED = "completed"
     FAILED = "failed"
 

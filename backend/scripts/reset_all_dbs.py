@@ -41,6 +41,9 @@ def _to_asyncpg_dsn(url: str) -> str:
     )
 
 
+# Latest Alembic head — update this whenever a new migration is added.
+_CURRENT_HEAD = "a1b2c3d4e5f6"
+
 _RAG_KV_STORE_DDL = """
 CREATE TABLE IF NOT EXISTS rag_kv_store (
     workspace  VARCHAR(100) NOT NULL,
@@ -74,6 +77,27 @@ CREATE INDEX IF NOT EXISTS idx_rag_doc_status_ws ON rag_doc_status (workspace);
 CREATE INDEX IF NOT EXISTS idx_rag_doc_status_fp ON rag_doc_status (file_path);
 """
 
+# Seed the SAMpai system user (normally done by alembic migration a6b7c8d9e0f1).
+# ON CONFLICT DO NOTHING makes this idempotent if the script is re-run.
+_SAMPAI_SEED_SQL = """
+INSERT INTO users (username, email, hashed_password, is_system)
+VALUES ('SAMpai', 'sampai@system.local', '!locked!', TRUE)
+ON CONFLICT (username) DO NOTHING
+"""
+
+# Stamp the alembic_version table so that running 'alembic upgrade head' after
+# this script doesn't try to re-create tables that already exist.
+# Update _CURRENT_HEAD above whenever a new migration is added.
+_ALEMBIC_STAMP_DDL = f"""
+CREATE TABLE IF NOT EXISTS alembic_version (
+    version_num VARCHAR(32) NOT NULL,
+    CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num)
+);
+INSERT INTO alembic_version (version_num)
+VALUES ('{_CURRENT_HEAD}')
+ON CONFLICT (version_num) DO NOTHING;
+"""
+
 
 async def reset_postgres() -> None:
     """
@@ -104,12 +128,16 @@ async def reset_postgres() -> None:
     await init_db()
     print("[pg]   ORM tables created via Base.metadata.create_all")
 
-    # RAG tables (would normally come from alembic migration b1c2d3e4f5a6)
+    # RAG tables + SAMpai seed + Alembic version stamp
     conn = await asyncpg.connect(dsn=dsn, timeout=10)
     try:
         await conn.execute(_RAG_KV_STORE_DDL)
         await conn.execute(_RAG_DOC_STATUS_DDL)
         print("[pg]   rag_kv_store + rag_doc_status created")
+        await conn.execute(_SAMPAI_SEED_SQL)
+        print("[pg]   SAMpai system user seeded")
+        await conn.execute(_ALEMBIC_STAMP_DDL)
+        print(f"[pg]   Alembic version stamped → {_CURRENT_HEAD}")
     finally:
         await conn.close()
 
