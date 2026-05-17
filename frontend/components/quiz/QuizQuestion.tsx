@@ -1,8 +1,8 @@
 "use client"
 
-import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import type { QuestionPublic } from "@/api/quiz"
+
+const LETTERS = ["A", "B", "C", "D", "E"]
 
 interface Props {
   question: QuestionPublic
@@ -12,37 +12,56 @@ interface Props {
 }
 
 export function QuizQuestion({ question, value, onChange, disabled }: Props) {
+  const makeOption = (val: string, label: string, letter?: string) => {
+    const selected = value === val
+    return (
+      <button
+        key={val}
+        type="button"
+        disabled={disabled}
+        onClick={() => onChange(val)}
+        className={`w-full text-left rounded-xl border text-sm transition-all flex items-center gap-3 px-4 py-3 ${
+          disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+        } ${
+          selected
+            ? "border-chart-1/60 bg-chart-1/20 text-foreground shadow-sm"
+            : "border-border/50 bg-card/60 text-foreground hover:border-chart-1/40 hover:bg-card/80"
+        }`}
+      >
+        {letter && (
+          <span
+            className={`flex-none w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 transition-colors ${
+              selected
+                ? "bg-chart-1/30 text-chart-1"
+                : "bg-border/30 text-muted-foreground"
+            }`}
+          >
+            {letter}
+          </span>
+        )}
+        <span className="leading-relaxed">{label}</span>
+      </button>
+    )
+  }
+
   if (question.type === "mcq" && question.options) {
     return (
-      <div className="space-y-2">
-        <p className="font-medium text-sm leading-relaxed">{question.prompt}</p>
-        <RadioGroup value={value ?? ""} onValueChange={onChange} disabled={disabled}>
-          {question.options.map((opt, idx) => (
-            <div key={idx} className="flex items-center gap-2">
-              <RadioGroupItem value={String(idx)} id={`q${question.id}-opt${idx}`} />
-              <Label htmlFor={`q${question.id}-opt${idx}`} className="cursor-pointer text-sm">
-                {opt}
-              </Label>
-            </div>
-          ))}
-        </RadioGroup>
+      <div className="space-y-3">
+        <p className="font-semibold text-sm leading-relaxed text-foreground">{question.prompt}</p>
+        <div className="space-y-2">
+          {question.options.map((opt, idx) => makeOption(String(idx), opt, LETTERS[idx]))}
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-2">
-      <p className="font-medium text-sm leading-relaxed">{question.prompt}</p>
-      <RadioGroup value={value ?? ""} onValueChange={onChange} disabled={disabled}>
-        <div className="flex items-center gap-2">
-          <RadioGroupItem value="true" id={`q${question.id}-true`} />
-          <Label htmlFor={`q${question.id}-true`} className="cursor-pointer text-sm">True</Label>
-        </div>
-        <div className="flex items-center gap-2">
-          <RadioGroupItem value="false" id={`q${question.id}-false`} />
-          <Label htmlFor={`q${question.id}-false`} className="cursor-pointer text-sm">False</Label>
-        </div>
-      </RadioGroup>
+    <div className="space-y-3">
+      <p className="font-semibold text-sm leading-relaxed text-foreground">{question.prompt}</p>
+      <div className="flex gap-2">
+        {makeOption("true", "True")}
+        {makeOption("false", "False")}
+      </div>
     </div>
   )
 }

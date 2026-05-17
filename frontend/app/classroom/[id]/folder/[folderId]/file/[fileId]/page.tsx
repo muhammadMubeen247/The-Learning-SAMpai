@@ -3,6 +3,9 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
+import { motion } from "framer-motion"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import API from "@/api/axios"
 import { useCurrentUser, type CurrentUser } from "@/hooks/use-current-user"
 import { normalizeErrorDetail } from "@/lib/error-utils"
@@ -10,16 +13,18 @@ import { useTheme } from "@/hooks/use-theme"
 import ClassroomSidebar from "@/components/classroom/sidebar"
 import ClassroomHeader from "@/components/classroom/header"
 import { LoadingOverlay } from "@/components/ui/liquid-orb-loader"
-import { Download, Send, Loader2, FileText, CheckCircle2, Clock, AlertCircle, RefreshCw } from "lucide-react"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { Download, Send, Loader2, AlertCircle, RefreshCw, BookOpen, BrainCircuit, Map, MessageSquare } from "lucide-react"
 import { QuizPanel } from "@/components/quiz/QuizPanel"
 import { FlashcardPanel } from "@/components/flashcards/FlashcardPanel"
 import MindmapShell from "@/components/mindmap/mindmap-shell"
 import { InviteButton } from "@/components/group-chat/invite-button"
 
-const Squares = dynamic(() => import("@/components/backgrounds/squares"), { ssr: false })
+const Plasma = dynamic(
+  () => import("@/components/backgrounds/plasma").then((m) => ({ default: m.Plasma })),
+  { ssr: false }
+)
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── Types ──────────────────────────────────────────────────────────────────────
 
 type Classroom = {
   id: number
@@ -53,7 +58,86 @@ type ChatMessage = {
   timestamp: string
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
+type TabId = "chat" | "quiz" | "flashcards" | "mindmap"
+
+// ── Sub-components ─────────────────────────────────────────────────────────────
+
+function ThinkingDots() {
+  return (
+    <div className="flex justify-start px-1">
+      <div className="rounded-2xl rounded-bl-sm bg-card/40 backdrop-blur-md border border-white/10 dark:border-white/10 px-4 py-3.5">
+        <div className="flex gap-1.5 items-center h-4">
+          {[0, 1, 2].map((i) => (
+            <motion.span
+              key={i}
+              className="block w-1.5 h-1.5 rounded-full bg-foreground/50"
+              animate={{ y: [0, -5, 0] }}
+              transition={{ duration: 0.9, delay: i * 0.18, repeat: Infinity, ease: "easeInOut" }}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const mdComponents = {
+  p: ({ children }: { children: React.ReactNode }) => (
+    <p className="mb-1 last:mb-0 leading-relaxed">{children}</p>
+  ),
+  strong: ({ children }: { children: React.ReactNode }) => (
+    <strong className="font-semibold">{children}</strong>
+  ),
+  em: ({ children }: { children: React.ReactNode }) => <em className="italic">{children}</em>,
+  ul: ({ children }: { children: React.ReactNode }) => (
+    <ul className="list-disc pl-4 mb-1 space-y-0.5">{children}</ul>
+  ),
+  ol: ({ children }: { children: React.ReactNode }) => (
+    <ol className="list-decimal pl-4 mb-1 space-y-0.5">{children}</ol>
+  ),
+  li: ({ children }: { children: React.ReactNode }) => <li>{children}</li>,
+  code: ({ children }: { children: React.ReactNode }) => (
+    <code className="bg-black/20 dark:bg-white/10 px-1 py-0.5 rounded text-xs font-mono">{children}</code>
+  ),
+  blockquote: ({ children }: { children: React.ReactNode }) => (
+    <blockquote className="border-l-2 border-border/60 pl-3 italic text-foreground/70">{children}</blockquote>
+  ),
+}
+
+function MarkdownContent({ content }: { content: string }) {
+  return (
+    <div className="text-sm text-foreground">
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents as never}>
+        {content}
+      </ReactMarkdown>
+    </div>
+  )
+}
+
+function StreamingText({ text, onDone }: { text: string; onDone: () => void }) {
+  const [displayed, setDisplayed] = useState("")
+  const onDoneRef = useRef(onDone)
+  onDoneRef.current = onDone
+
+  useEffect(() => {
+    const words = text.split(" ")
+    const msPerWord = Math.max(8, Math.min(35, 1600 / words.length))
+    let i = 0
+    const timer = setInterval(() => {
+      i++
+      setDisplayed(words.slice(0, i).join(" "))
+      if (i >= words.length) {
+        clearInterval(timer)
+        onDoneRef.current()
+      }
+    }, msPerWord)
+    return () => clearInterval(timer)
+  }, [text])
+
+  return <MarkdownContent content={displayed} />
+}
+
+// ── Main page ──────────────────────────────────────────────────────────────────
 
 export default function FilePage() {
   const params = useParams()
@@ -73,21 +157,20 @@ export default function FilePage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<TabId>("chat")
 
   // Chat
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [question, setQuestion] = useState("")
   const [isAsking, setIsAsking] = useState(false)
   const [chatError, setChatError] = useState<string | null>(null)
+  const [freshMessageId, setFreshMessageId] = useState<number | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-
-  // Polling when file is still processing
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  const borderColor = theme === "dark" ? "rgba(147, 197, 253, 0.3)" : "rgba(56, 189, 248, 0.4)"
-  const hoverFillColor = theme === "dark" ? "rgba(147, 197, 253, 0.1)" : "rgba(56, 189, 248, 0.15)"
+  const plasmaColor = theme === "dark" ? "#60a5fa" : "#3b82f6"
 
-  // ── Auth helper ───────────────────────────────────────────────────────────────
+  // ── Auth ────────────────────────────────────────────────────────────────────
 
   const clearAuthAndRedirect = useCallback(() => {
     if (typeof window !== "undefined") {
@@ -98,15 +181,15 @@ export default function FilePage() {
     router.push("/login")
   }, [router, setUser])
 
-  // ── Data fetching ─────────────────────────────────────────────────────────────
+  // ── Data fetching ───────────────────────────────────────────────────────────
 
   const fetchFileData = useCallback(async () => {
     try {
       const res = await API.get<FileType>(`/files/${fileId}`)
       setFile(res.data)
       return res.data
-    } catch (err: any) {
-      if (err?.response?.status === 401) clearAuthAndRedirect()
+    } catch (err: unknown) {
+      if ((err as { response?: { status?: number } })?.response?.status === 401) clearAuthAndRedirect()
       return null
     }
   }, [fileId, clearAuthAndRedirect])
@@ -118,11 +201,9 @@ export default function FilePage() {
       )
       setMessages(res.data.messages)
     } catch {
-      // Non-fatal
+      // non-fatal
     }
   }, [fileId])
-
-  // ── Polling for processing status ─────────────────────────────────────────────
 
   const startPolling = useCallback(() => {
     if (pollIntervalRef.current) return
@@ -131,20 +212,12 @@ export default function FilePage() {
       if (updated && (updated.processing_status === "completed" || updated.processing_status === "failed")) {
         clearInterval(pollIntervalRef.current!)
         pollIntervalRef.current = null
-        if (updated.processing_status === "completed") {
-          await fetchHistory()
-        }
+        if (updated.processing_status === "completed") await fetchHistory()
       }
     }, 3000)
   }, [fetchFileData, fetchHistory])
 
-  useEffect(() => {
-    return () => {
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
-    }
-  }, [])
-
-  // ── Initial load ──────────────────────────────────────────────────────────────
+  useEffect(() => () => { if (pollIntervalRef.current) clearInterval(pollIntervalRef.current) }, [])
 
   useEffect(() => {
     if (userLoading) return
@@ -161,38 +234,33 @@ export default function FilePage() {
           API.get<FileType[]>(`/files/folder/${folderId}`),
         ])
         setClassroom(clsRes.data)
-        const foundFolder = foldersRes.data.find((f) => f.id === folderId)
-        setFolder(foundFolder ?? null)
+        setFolder(foldersRes.data.find((f) => f.id === folderId) ?? null)
         const f = fileRes.data
         setFile(f)
         setFiles(filesRes.data)
-
         if (f.processing_status === "completed" || f.processing_status === "naive_ready") {
           await fetchHistory()
         }
-
-        // Keep polling on naive_ready too — Phase 2 still running in background
         if (f.processing_status === "pending" || f.processing_status === "processing" || f.processing_status === "naive_ready") {
           startPolling()
         }
-      } catch (err: any) {
-        if (err?.response?.status === 401) clearAuthAndRedirect()
-        else if (err?.response?.status === 403) setError("You are not a member of this classroom")
+      } catch (err: unknown) {
+        const status = (err as { response?: { status?: number } })?.response?.status
+        if (status === 401) clearAuthAndRedirect()
+        else if (status === 403) setError("You are not a member of this classroom")
         else setError("Failed to load. Please try again.")
       } finally {
         setLoading(false)
       }
     }
-
     load()
   }, [userLoading, user, classroomId, folderId, fileId])
 
-  // Scroll to newest message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
+  }, [messages, isAsking])
 
-  // ── Chat ──────────────────────────────────────────────────────────────────────
+  // ── Actions ─────────────────────────────────────────────────────────────────
 
   const handleAsk = async () => {
     if (!question.trim() || isAsking || !canChat) return
@@ -200,22 +268,21 @@ export default function FilePage() {
     setQuestion("")
     setChatError(null)
     setIsAsking(true)
+    setFreshMessageId(null)
 
     const tempId = Date.now()
-    const tempUserMsg: ChatMessage = { id: tempId, role: "user", content: q, timestamp: new Date().toISOString() }
-    setMessages((prev) => [...prev, tempUserMsg])
+    setMessages((prev) => [...prev, { id: tempId, role: "user", content: q, timestamp: new Date().toISOString() }])
 
     try {
-      const res = await API.post<{ answer: string; message_id: number }>(
-        `/chat/files/${fileId}/ask`,
-        { question: q }
-      )
+      const res = await API.post<{ answer: string; message_id: number }>(`/chat/files/${fileId}/ask`, { question: q })
+      const newId = res.data.message_id
       setMessages((prev) => [
         ...prev,
-        { id: res.data.message_id, role: "assistant", content: res.data.answer, timestamp: new Date().toISOString() },
+        { id: newId, role: "assistant", content: res.data.answer, timestamp: new Date().toISOString() },
       ])
-    } catch (err: any) {
-      const detail = err?.response?.data?.detail
+      setFreshMessageId(newId)
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
       setChatError(normalizeErrorDetail(detail, "Failed to get an answer. Please try again."))
       setMessages((prev) => prev.filter((m) => m.id !== tempId))
     } finally {
@@ -233,20 +300,12 @@ export default function FilePage() {
     setIsDownloading(true)
     try {
       const res = await API.get<{ download_url: string }>(`/files/${fileId}/download`)
-      const url = res.data?.download_url
-      if (url && typeof window !== "undefined") window.open(url, "_blank")
+      if (res.data?.download_url) window.open(res.data.download_url, "_blank")
       else setActionError("Failed to get download link.")
-    } catch (err: any) {
-      setActionError(normalizeErrorDetail(err?.response?.data?.detail, "Failed to download file."))
+    } catch (err: unknown) {
+      setActionError(normalizeErrorDetail((err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail, "Failed to download."))
     } finally {
       setIsDownloading(false)
-    }
-  }
-
-  const handleManualRefresh = async () => {
-    const updated = await fetchFileData()
-    if (updated?.processing_status === "completed") {
-      await fetchHistory()
     }
   }
 
@@ -256,58 +315,29 @@ export default function FilePage() {
       setFile((prev) => prev ? { ...prev, processing_status: "pending", description: null } : prev)
       setMessages([])
       startPolling()
-    } catch (err: any) {
-      setActionError(normalizeErrorDetail(err?.response?.data?.detail, "Failed to start reprocessing."))
+    } catch (err: unknown) {
+      setActionError(normalizeErrorDetail((err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail, "Failed to start reprocessing."))
     }
   }
 
-  // ── Derived ───────────────────────────────────────────────────────────────────
+  // ── Derived ─────────────────────────────────────────────────────────────────
 
   const isOwner = user && classroom && user.id === classroom.owner_id
-  const summary = file?.description ?? null
   const status = file?.processing_status ?? "pending"
   const isCompleted = status === "completed"
   const isNaiveReady = status === "naive_ready"
   const isFailed = status === "failed"
   const isInProgress = status === "pending" || status === "processing"
-  // Phase 1 done → chat/flashcards/group-chat usable
   const naiveReady = isNaiveReady || isCompleted
-  // Phase 2 done → quiz/mindmap usable
   const fullReady = isCompleted
   const canChat = naiveReady
 
-  // ── Status badge ──────────────────────────────────────────────────────────────
-
-  const StatusBadge = () => {
-    if (isCompleted) return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-        <CheckCircle2 className="h-3.5 w-3.5" /> Ready
-      </span>
-    )
-    if (isNaiveReady) return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 border border-blue-500/30 px-3 py-1 text-xs font-medium text-blue-600 dark:text-blue-400">
-        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Chat Ready
-      </span>
-    )
-    if (isFailed) return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 border border-destructive/30 px-3 py-1 text-xs font-medium text-destructive">
-        <AlertCircle className="h-3.5 w-3.5" /> Failed
-      </span>
-    )
-    return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 px-3 py-1 text-xs font-medium text-amber-600 dark:text-amber-400">
-        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        {status === "processing" ? "Processing…" : "Queued…"}
-      </span>
-    )
-  }
-
-  // ── Loading / error ───────────────────────────────────────────────────────────
+  // ── Loading / error ──────────────────────────────────────────────────────────
 
   if (loading || userLoading) {
     return (
       <div className="min-h-screen w-screen bg-background flex items-center justify-center">
-        <LoadingOverlay isLoading={true} progress={0} message="Loading file…" size="xl" fullScreen={true} />
+        <LoadingOverlay isLoading progress={0} message="Loading file…" size="xl" fullScreen />
       </div>
     )
   }
@@ -326,10 +356,37 @@ export default function FilePage() {
     )
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────────
+  // Summary injected as synthetic first assistant message
+  const summaryMessage: ChatMessage | null = file.description
+    ? { id: -1, role: "assistant", content: file.description, timestamp: file.uploaded_at }
+    : null
+
+  // ── Tab config ───────────────────────────────────────────────────────────────
+
+  const tabs: { id: TabId; label: string; icon: React.ReactNode; disabled?: boolean; loading?: boolean }[] = [
+    { id: "chat", label: "Chat", icon: <MessageSquare className="h-3.5 w-3.5" /> },
+    { id: "quiz", label: "Quiz", icon: <BookOpen className="h-3.5 w-3.5" />, disabled: !fullReady, loading: isNaiveReady },
+    { id: "flashcards", label: "Flashcards", icon: <BrainCircuit className="h-3.5 w-3.5" /> },
+    { id: "mindmap", label: "Mindmap", icon: <Map className="h-3.5 w-3.5" />, disabled: !fullReady, loading: isNaiveReady },
+  ]
+
+  // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
     <div className="relative min-h-screen w-full overflow-x-hidden bg-background">
+
+      {/* Plasma — fixed, behind everything */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <Plasma
+          color={plasmaColor}
+          speed={0.35}
+          direction="forward"
+          scale={1.15}
+          opacity={theme === "dark" ? 0.45 : 0.3}
+          mouseInteractive={false}
+        />
+      </div>
+
       <ClassroomHeader
         classroomName={classroom.name}
         folderName={folder.name}
@@ -358,223 +415,201 @@ export default function FilePage() {
           onHomeClick={() => router.push(isOwner ? "/created" : "/joined")}
         />
 
-        <main className={`flex-1 flex flex-col h-[calc(100vh-4rem)] transition-all duration-300 ${sidebarCollapsed ? "ml-0" : "ml-[280px]"}`}>
+        <main className={`relative z-10 flex-1 flex flex-col h-[calc(100vh-4rem)] transition-all duration-300 ${sidebarCollapsed ? "ml-0" : "ml-[280px]"}`}>
 
-          {/* Background */}
-          <div className="absolute inset-0 top-16 opacity-60 pointer-events-none z-0">
-            <Squares speed={0.5} squareSize={40} direction="diagonal" borderColor={borderColor} hoverFillColor={hoverFillColor} />
+          {/* ── Top bar: tabs + action buttons ── */}
+          <div className="shrink-0 flex items-center justify-between gap-3 px-4 pt-3 pb-2">
+
+            {/* Tab pills */}
+            <div className="flex items-center gap-1 bg-card/30 backdrop-blur-md border border-border/40 rounded-full p-1">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  disabled={tab.disabled}
+                  onClick={() => {
+                    if (tab.disabled) return
+                    if (tab.id === "mindmap") setSidebarCollapsed(true)
+                    setActiveTab(tab.id)
+                  }}
+                  title={tab.disabled ? "Available once full analysis finishes" : undefined}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer disabled:cursor-not-allowed ${
+                    activeTab === tab.id
+                      ? "bg-card/80 border border-border/60 text-foreground shadow-sm"
+                      : tab.disabled
+                      ? "text-muted-foreground/40"
+                      : "text-muted-foreground hover:text-foreground hover:bg-card/40"
+                  }`}
+                >
+                  {tab.loading ? <Loader2 className="h-3 w-3 animate-spin opacity-60" /> : tab.icon}
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex items-center gap-2 shrink-0">
+              {actionError && (
+                <span className="text-xs text-destructive max-w-[160px] truncate">{actionError}</span>
+              )}
+              {isFailed && (
+                <button onClick={handleReprocess}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-destructive/10 border border-destructive/30 text-destructive hover:bg-destructive/20 cursor-pointer transition-colors">
+                  <RefreshCw className="h-3 w-3" /> Retry
+                </button>
+              )}
+              {isInProgress && (
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs text-amber-500 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  {status === "processing" ? "Processing…" : "Queued…"}
+                </span>
+              )}
+              <InviteButton fileId={fileId} classroomId={classroomId} />
+              <button type="button" onClick={handleDownload} disabled={isDownloading}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-card/50 backdrop-blur-sm border border-border/50 text-foreground hover:bg-card/70 disabled:opacity-50 cursor-pointer transition-colors">
+                {isDownloading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                {isDownloading ? "Preparing…" : "Download"}
+              </button>
+            </div>
           </div>
 
-          <div className="relative z-10 flex flex-col h-full px-6 pt-6 pb-4 gap-4">
+          {/* ── Tab content panels ── */}
+          <div className="flex-1 min-h-0 px-4 pb-4">
 
-            {/* File header row */}
-            <div className="flex items-center justify-between gap-3 shrink-0">
-              <div className="flex items-center gap-3 min-w-0">
-                <FileText className="h-5 w-5 text-primary shrink-0" />
-                <h2 className="truncate text-xl font-semibold text-foreground">{file.filename}</h2>
+            {/* ── CHAT ── */}
+            <div className={`h-full flex flex-col gap-3 ${activeTab === "chat" ? "flex" : "hidden"}`}>
+
+              {/* Messages */}
+              <div className="flex-1 min-h-0 overflow-y-auto space-y-3 py-2 px-1">
+
+                {/* Summary as first AI message */}
+                {summaryMessage && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.35 }}
+                    className="flex justify-start"
+                  >
+                    <div className="max-w-[82%] rounded-2xl rounded-bl-sm bg-card/40 backdrop-blur-md border border-white/10 dark:border-white/10 px-4 py-3">
+                      <MarkdownContent content={summaryMessage.content} />
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Empty state (no summary, no messages) */}
+                {!summaryMessage && messages.length === 0 && (
+                  <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
+                    {isFailed ? (
+                      <>
+                        <AlertCircle className="h-6 w-6 text-destructive" />
+                        <p className="text-sm text-destructive">Processing failed.</p>
+                        <button onClick={handleReprocess}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 border border-destructive/30 px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/20 cursor-pointer">
+                          <RefreshCw className="h-3.5 w-3.5" /> Retry
+                        </button>
+                      </>
+                    ) : isInProgress ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">Processing document…</p>
+                        <p className="text-xs text-muted-foreground/60">Large files may take 2–5 minutes.</p>
+                      </>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Ask anything about this document.</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Chat history */}
+                {messages.map((msg) => (
+                  <motion.div
+                    key={msg.id}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.25 }}
+                    className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                  >
+                    {msg.role === "user" ? (
+                      <div className="max-w-[82%] rounded-2xl rounded-br-sm bg-chart-1/25 backdrop-blur-md border border-chart-1/20 px-4 py-3">
+                        <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                      </div>
+                    ) : (
+                      <div className="max-w-[82%] rounded-2xl rounded-bl-sm bg-card/40 backdrop-blur-md border border-white/10 dark:border-white/10 px-4 py-3">
+                        {msg.id === freshMessageId ? (
+                          <StreamingText text={msg.content} onDone={() => setFreshMessageId(null)} />
+                        ) : (
+                          <MarkdownContent content={msg.content} />
+                        )}
+                      </div>
+                    )}
+                  </motion.div>
+                ))}
+
+                {isAsking && <ThinkingDots />}
+
+                {chatError && (
+                  <p className="text-center text-xs text-destructive">{chatError}</p>
+                )}
+
+                <div ref={messagesEndRef} />
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <StatusBadge />
-                {isFailed && (
-                  <button onClick={handleReprocess}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 border border-primary/30 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20 cursor-pointer">
-                    <RefreshCw className="h-3 w-3" /> Retry
+
+              {/* Input bar */}
+              <div className="shrink-0">
+                <div className="flex items-end gap-2 bg-card/30 backdrop-blur-md border border-border/40 rounded-2xl p-2">
+                  <textarea
+                    value={question}
+                    onChange={(e) => setQuestion(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    disabled={isAsking || !canChat}
+                    placeholder={
+                      isFailed ? "Processing failed — click Retry"
+                      : isInProgress ? "Processing document, check back shortly…"
+                      : "Ask a question… (Enter to send, Shift+Enter for new line)"
+                    }
+                    rows={1}
+                    className="flex-1 resize-none bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed max-h-32 overflow-y-auto"
+                    style={{ fieldSizing: "content" } as React.CSSProperties}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAsk}
+                    disabled={!question.trim() || isAsking || !canChat}
+                    className="shrink-0 flex items-center justify-center rounded-xl bg-chart-1/80 hover:bg-chart-1 w-9 h-9 text-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                  >
+                    {isAsking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                   </button>
-                )}
-                {isCompleted && (
-                  <button onClick={handleManualRefresh} title="Refresh"
-                    className="p-1.5 rounded-md border border-border hover:bg-card/70 text-muted-foreground cursor-pointer">
-                    <RefreshCw className="h-3.5 w-3.5" />
-                  </button>
-                )}
-                <InviteButton fileId={fileId} classroomId={classroomId} />
+                </div>
+                <p className="mt-1 text-[11px] text-muted-foreground/50 px-2">
+                  {canChat ? "Enter · send  ·  Shift+Enter · new line" : isInProgress ? "Processing in background…" : ""}
+                </p>
               </div>
             </div>
 
-            {/* Action error */}
-            {actionError && (
-              <div className="shrink-0 rounded-md border border-destructive/40 bg-destructive/5 px-4 py-2 text-sm text-destructive">
-                {actionError}
-              </div>
-            )}
+            {/* ── QUIZ ── */}
+            <div className={`h-full rounded-2xl border border-border/40 bg-card/30 backdrop-blur-md overflow-hidden ${activeTab === "quiz" ? "flex flex-col" : "hidden"}`}>
+              <QuizPanel fileId={Number(fileId)} canQuiz={fullReady} />
+            </div>
 
-            {/* Summary card */}
-            <div className="shrink-0 rounded-xl border border-border bg-card/70 backdrop-blur-sm px-5 py-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                Document Summary
-              </p>
-              {summary ? (
-                <p className="text-sm text-foreground leading-relaxed">{summary}</p>
-              ) : (isCompleted || isNaiveReady) ? (
-                <p className="text-sm text-muted-foreground italic">No summary available for this document.</p>
-              ) : isFailed ? (
-                <p className="text-sm text-destructive italic">Processing failed. Try re-uploading the file.</p>
+            {/* ── FLASHCARDS ── */}
+            <div className={`h-full rounded-2xl border border-border/40 bg-card/30 backdrop-blur-md overflow-hidden ${activeTab === "flashcards" ? "flex flex-col" : "hidden"}`}>
+              <FlashcardPanel fileId={Number(fileId)} canFlashcard={naiveReady} />
+            </div>
+
+            {/* ── MINDMAP ── */}
+            <div className={`h-full rounded-2xl border border-border/40 bg-card/30 backdrop-blur-md overflow-hidden ${activeTab === "mindmap" ? "flex flex-col" : "hidden"}`}>
+              {fullReady ? (
+                <MindmapShell fileId={Number(fileId)} classroomId={classroomId} fileName={file.filename} />
               ) : (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground italic">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Generating summary… this may take a minute for large files.
+                <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+                  Mindmap will be available once full document analysis finishes.
                 </div>
               )}
             </div>
 
-            {/* ── Chat / Quiz / Flashcards tabs ── */}
-            <Tabs defaultValue="chat" className="flex-1 flex flex-col min-h-0">
-              <TabsList className="self-start mx-0 mb-1">
-                <TabsTrigger value="chat">Chat</TabsTrigger>
-                <TabsTrigger value="quiz" disabled={!fullReady}
-                  title={!fullReady ? "Quiz becomes available once full document analysis finishes." : undefined}>
-                  <span className="flex items-center gap-1.5">
-                    Quiz
-                    {isNaiveReady && <Loader2 className="h-3 w-3 animate-spin opacity-50" />}
-                  </span>
-                </TabsTrigger>
-                <TabsTrigger value="flashcards">Flashcards</TabsTrigger>
-                <TabsTrigger value="mindmap" disabled={!fullReady}
-                  title={!fullReady ? "Mindmap becomes available once full document analysis finishes." : undefined}>
-                  <span className="flex items-center gap-1.5">
-                    Mindmap
-                    {isNaiveReady && <Loader2 className="h-3 w-3 animate-spin opacity-50" />}
-                  </span>
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="chat" className="flex-1 flex flex-col min-h-0 mt-0">
-                <div className="flex-1 flex flex-col min-h-0 rounded-xl border border-border bg-card/50 backdrop-blur-sm overflow-hidden">
-
-                  {/* Messages scroll area */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                    {messages.length === 0 && (
-                      <div className="flex flex-col items-center justify-center h-full text-center gap-2 py-8">
-                        {canChat ? (
-                          <>
-                            <CheckCircle2 className="h-6 w-6 text-emerald-500" />
-                            <p className="text-sm font-medium text-foreground">Ready to answer questions</p>
-                            <p className="text-xs text-muted-foreground">Ask anything about this document below.</p>
-                          </>
-                        ) : isFailed ? (
-                          <>
-                            <AlertCircle className="h-6 w-6 text-destructive" />
-                            <p className="text-sm text-destructive">Processing failed.</p>
-                            <button onClick={handleReprocess}
-                              className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 cursor-pointer">
-                              <RefreshCw className="h-3.5 w-3.5" /> Retry
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                            <p className="text-sm text-muted-foreground">
-                              Processing document… Q&amp;A will be available shortly.
-                            </p>
-                            <p className="text-xs text-muted-foreground/60">
-                              Large files (PDF, PPTX) may take 2–5 minutes.
-                            </p>
-                          </>
-                        )}
-                      </div>
-                    )}
-
-                    {messages.map((msg) => (
-                      <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                        <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                          msg.role === "user"
-                            ? "bg-primary text-primary-foreground rounded-br-sm"
-                            : "border border-border bg-card text-foreground rounded-bl-sm"
-                        }`}>
-                          <p className="whitespace-pre-wrap">{msg.content}</p>
-                        </div>
-                      </div>
-                    ))}
-
-                    {isAsking && (
-                      <div className="flex justify-start">
-                        <div className="rounded-2xl rounded-bl-sm border border-border bg-card px-4 py-3 text-sm text-muted-foreground flex items-center gap-2">
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Thinking…
-                        </div>
-                      </div>
-                    )}
-
-                    <div ref={messagesEndRef} />
-                  </div>
-
-                  {/* Chat error */}
-                  {chatError && (
-                    <p className="px-4 pb-1 text-xs text-destructive shrink-0">{chatError}</p>
-                  )}
-
-                  {/* Input area — always visible */}
-                  <div className="shrink-0 border-t border-border bg-card/80 p-3">
-                    <div className="flex items-end gap-2">
-                      <textarea
-                        value={question}
-                        onChange={(e) => setQuestion(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        disabled={isAsking || !canChat}
-                        placeholder={
-                          isFailed
-                            ? "Processing failed — click Retry above"
-                            : isInProgress
-                            ? "Processing document… check back in a moment"
-                            : "Ask a question about this document… (Enter to send, Shift+Enter for new line)"
-                        }
-                        rows={2}
-                        className="flex-1 resize-none rounded-xl border border-border bg-background/60 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-40 disabled:cursor-not-allowed"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleAsk}
-                        disabled={!question.trim() || isAsking || !canChat}
-                        className="shrink-0 flex items-center justify-center rounded-xl bg-primary w-11 h-11 text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                      >
-                        {isAsking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                      </button>
-                    </div>
-                    <p className="mt-1.5 text-[11px] text-muted-foreground/60 px-1">
-                      {canChat ? "Enter to send · Shift+Enter for new line" : isInProgress ? "Processing in background…" : ""}
-                    </p>
-                  </div>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="quiz" className="flex-1 flex flex-col min-h-0 mt-0">
-                <div className="flex-1 flex flex-col min-h-0 rounded-xl border border-border bg-card/50 backdrop-blur-sm overflow-hidden">
-                  <QuizPanel fileId={Number(fileId)} canQuiz={fullReady} />
-                </div>
-              </TabsContent>
-
-              <TabsContent value="flashcards" className="flex-1 flex flex-col min-h-0 mt-0">
-                <div className="flex-1 flex flex-col min-h-0 rounded-xl border border-border bg-card/50 backdrop-blur-sm overflow-hidden">
-                  <FlashcardPanel fileId={Number(fileId)} canFlashcard={naiveReady} />
-                </div>
-              </TabsContent>
-
-              <TabsContent value="mindmap" className="flex-1 flex flex-col min-h-0 mt-0">
-                <div className="flex-1 rounded-xl border border-border bg-card/50 backdrop-blur-sm overflow-hidden" style={{ height: '100%' }}>
-                  {fullReady ? (
-                    <MindmapShell
-                      fileId={Number(fileId)}
-                      classroomId={classroomId}
-                      fileName={file?.filename ?? ""}
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-                      Mindmap will be available once full document analysis finishes.
-                    </div>
-                  )}
-                </div>
-              </TabsContent>
-            </Tabs>
-
           </div>
         </main>
       </div>
-
-      {/* Floating download button */}
-      <button type="button" onClick={handleDownload} disabled={isDownloading}
-        className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2 rounded-full border border-border/60 bg-primary text-primary-foreground px-5 py-3 shadow-xl shadow-primary/30 hover:bg-primary/90 disabled:opacity-60 cursor-pointer">
-        <Download className="h-5 w-5" />
-        <span className="text-sm font-medium">{isDownloading ? "Preparing…" : "Download"}</span>
-      </button>
     </div>
   )
 }

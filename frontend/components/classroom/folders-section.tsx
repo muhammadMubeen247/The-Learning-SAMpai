@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { Plus, X } from "lucide-react"
+import { Plus, X, Trash2 } from "lucide-react"
 import Folder from "@/components/backgrounds/folder"
 import Orb from "@/components/backgrounds/orb"
 import API from "@/api/axios"
@@ -34,9 +34,16 @@ export default function FoldersSection({
   const [loading, setLoading] = useState(true)
   const [loadingProgress, setLoadingProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
+
+  // Create modal state
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [folderName, setFolderName] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Delete modal state
+  const [deletingFolder, setDeletingFolder] = useState<FolderType | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const folderColor = theme === "dark" ? "#93C5FD" : "#38BDF8"
 
@@ -44,15 +51,14 @@ export default function FoldersSection({
     setLoading(true)
     setLoadingProgress(0)
     setError(null)
-    
-    // Simulate progress for better UX
+
     const progressInterval = setInterval(() => {
       setLoadingProgress((prev) => {
         if (prev >= 90) return prev
         return prev + Math.random() * 15
       })
     }, 100)
-    
+
     try {
       setLoadingProgress(30)
       const res = await API.get<FolderType[]>(`/folders/classroom/${classroomId}`)
@@ -111,15 +117,30 @@ export default function FoldersSection({
     }
   }
 
+  const handleDeleteFolder = async (folderId: number) => {
+    setIsDeleting(true)
+    setDeleteError(null)
+    try {
+      await API.delete(`/folders/${folderId}`)
+      setFolders((prev) => prev.filter((f) => f.id !== folderId))
+      setDeletingFolder(null)
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail
+      setDeleteError(normalizeErrorDetail(detail, "Failed to delete folder"))
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   const hasFolders = folders.length > 0
   const showCreateButton = isOwner
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 pt-20 sm:pt-24 md:pt-28 min-h-full w-full overflow-x-hidden">
+    <div className="p-4 sm:p-6 md:p-8 pt-20 sm:pt-24 md:pt-28 w-full overflow-x-hidden">
       <div className="max-w-[1400px] mx-auto w-full">
         {loading ? (
           <div className="flex items-center justify-center py-16 min-h-[60vh]">
-            <LoadingOrb 
+            <LoadingOrb
               progress={loadingProgress}
               size="lg"
               message="Loading folders..."
@@ -131,7 +152,6 @@ export default function FoldersSection({
             <p className="text-muted-foreground">No folders yet</p>
           </div>
         ) : !hasFolders && showCreateButton ? (
-          // Center the create button when no folders exist
           <div className="flex items-center justify-center min-h-[60vh]">
             <div className="group flex flex-col items-center gap-6">
               <button
@@ -156,9 +176,25 @@ export default function FoldersSection({
             {folders.map((folder) => (
               <div
                 key={folder.id}
-                className="group flex flex-col items-center cursor-pointer"
+                className="group relative flex flex-col items-center cursor-pointer"
                 onClick={() => router.push(`/classroom/${classroomId}/folder/${folder.id}`)}
               >
+                {/* Delete button — owner only, appears on hover */}
+                {isOwner && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setDeletingFolder(folder)
+                      setDeleteError(null)
+                    }}
+                    className="absolute top-0 right-2 z-30 opacity-0 group-hover:opacity-100 transition-opacity w-8 h-8 rounded-full flex items-center justify-center bg-card/70 backdrop-blur-sm border border-border/40 text-muted-foreground/60 hover:text-destructive hover:border-destructive/40 hover:bg-destructive/10 cursor-pointer"
+                    title="Delete folder"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
+
                 <div className="relative flex items-center justify-center w-full h-[150px] mb-2 overflow-visible">
                   <div className="absolute inset-0 blur-2xl bg-gradient-to-br from-chart-1/30 to-chart-2/30 rounded-full pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity" />
                   <div className="relative z-10 flex items-center justify-center">
@@ -177,7 +213,7 @@ export default function FoldersSection({
               </div>
             ))}
 
-            {/* Create Folder Button (Owner Only) - Positioned after folders in grid */}
+            {/* Create Folder Button (Owner Only) */}
             {showCreateButton && (
               <div className="group flex flex-col items-center">
                 <div className="relative flex items-center justify-center w-full h-[150px] mb-2">
@@ -202,7 +238,7 @@ export default function FoldersSection({
         )}
       </div>
 
-      {/* Create Folder Modal */}
+      {/* ── Create Folder Modal ── */}
       <AnimatePresence>
         {showCreateModal && (
           <>
@@ -275,7 +311,75 @@ export default function FoldersSection({
           </>
         )}
       </AnimatePresence>
+
+      {/* ── Delete Folder Confirmation Modal ── */}
+      <AnimatePresence>
+        {deletingFolder && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="fixed inset-0 z-30 bg-background/50 backdrop-blur-md"
+              aria-hidden
+              onClick={() => { setDeletingFolder(null); setDeleteError(null) }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              transition={{ type: "spring", stiffness: 260, damping: 22 }}
+              className="fixed inset-0 z-40 grid place-items-center p-4"
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="w-full max-w-sm rounded-2xl border border-destructive/30 bg-card/80 backdrop-blur-xl shadow-2xl p-6 space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex-none w-9 h-9 rounded-full flex items-center justify-center bg-destructive/10 border border-destructive/30">
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-base font-semibold text-foreground">
+                      Delete &ldquo;{deletingFolder.name}&rdquo;?
+                    </h3>
+                    <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+                      This will permanently delete this folder and all{" "}
+                      <span className="font-medium text-foreground">
+                        {deletingFolder.files.length} file{deletingFolder.files.length !== 1 ? "s" : ""}
+                      </span>{" "}
+                      inside it. This cannot be undone.
+                    </p>
+                  </div>
+                </div>
+
+                {deleteError && (
+                  <p className="text-sm text-destructive">{deleteError}</p>
+                )}
+
+                <div className="flex gap-3 justify-end pt-1">
+                  <button
+                    type="button"
+                    onClick={() => { setDeletingFolder(null); setDeleteError(null) }}
+                    disabled={isDeleting}
+                    className="px-4 py-2 rounded-xl border border-border/60 bg-card/50 hover:bg-card/70 text-sm text-foreground cursor-pointer disabled:opacity-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteFolder(deletingFolder.id)}
+                    disabled={isDeleting}
+                    className="px-4 py-2 rounded-xl bg-destructive/80 hover:bg-destructive text-white text-sm font-medium cursor-pointer disabled:opacity-50 transition-colors"
+                  >
+                    {isDeleting ? "Deleting…" : "Delete folder"}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
-

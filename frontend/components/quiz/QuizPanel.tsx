@@ -1,16 +1,8 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Button } from "@/components/ui/button"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { motion } from "framer-motion"
+import { BookOpen } from "lucide-react"
 import { QuizQuestion } from "./QuizQuestion"
 import { QuizResult } from "./QuizResult"
 import { QuizHistory } from "./QuizHistory"
@@ -46,10 +38,10 @@ export function QuizPanel({ fileId, canQuiz }: Props) {
   const [numQuestions, setNumQuestions] = useState<"5" | "10" | "15">("10")
   const [difficulty, setDifficulty] = useState<Difficulty | "auto">("auto")
   const [submitting, setSubmitting] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
 
   const pollStartRef = useRef<number>(0)
 
-  // Load history and resume any open quiz on mount
   useEffect(() => {
     if (!canQuiz) return
     getQuizHistory(fileId)
@@ -85,7 +77,6 @@ export function QuizPanel({ fileId, canQuiz }: Props) {
     }
   }
 
-  // Polling while generating
   useEffect(() => {
     if (state !== "generating" || quizId == null) return
     const interval = setInterval(async () => {
@@ -125,9 +116,7 @@ export function QuizPanel({ fileId, canQuiz }: Props) {
       pollStartRef.current = Date.now()
       setState("generating")
     } catch (err: any) {
-      const msg =
-        err?.response?.data?.detail ?? "Failed to start quiz generation."
-      setErrorMsg(msg)
+      setErrorMsg(err?.response?.data?.detail ?? "Failed to start quiz generation.")
     }
   }
 
@@ -157,10 +146,7 @@ export function QuizPanel({ fileId, canQuiz }: Props) {
       const res = await submitQuiz(quizId, payload)
       setResult(res)
       setState("submitted")
-      // Refresh history
-      getQuizHistory(fileId)
-        .then((h) => setHistory(h.items))
-        .catch(() => {})
+      getQuizHistory(fileId).then((h) => setHistory(h.items)).catch(() => {})
     } catch (err: any) {
       setErrorMsg(err?.response?.data?.detail ?? "Failed to submit quiz.")
     } finally {
@@ -175,132 +161,223 @@ export function QuizPanel({ fileId, canQuiz }: Props) {
     setResult(null)
     setErrorMsg(null)
     setState("idle")
-    getQuizHistory(fileId)
-      .then((h) => setHistory(h.items))
-      .catch(() => {})
+    getQuizHistory(fileId).then((h) => setHistory(h.items)).catch(() => {})
+  }
+
+  function handleBack() {
+    setQuizId(null)
+    setQuestions([])
+    setAnswers({})
+    setResult(null)
+    setErrorMsg(null)
+    setState("idle")
+    getQuizHistory(fileId).then((h) => setHistory(h.items)).catch(() => {})
   }
 
   if (!canQuiz) {
     return (
       <div className="flex-1 flex items-center justify-center p-6">
         <p className="text-muted-foreground text-sm text-center">
-          Quiz will be available once this file finishes processing.
+          Quiz will be available once full analysis finishes.
         </p>
       </div>
     )
   }
 
+  const answeredCount = Object.keys(answers).length
+
   return (
-    <div className="flex-1 flex flex-col min-h-0 gap-3 p-4">
-      {/* Error banner */}
-      {errorMsg && (
-        <Alert variant="destructive">
-          <AlertDescription className="text-xs">{errorMsg}</AlertDescription>
-        </Alert>
-      )}
+    <div className="flex-1 flex flex-col min-h-0">
 
-      {/* ── IDLE: setup form ── */}
+      {/* ── IDLE ── */}
       {state === "idle" && (
-        <div className="space-y-4">
-          <div className="flex flex-wrap gap-3">
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground font-medium">Questions</p>
-              <Select
-                value={numQuestions}
-                onValueChange={(v) => setNumQuestions(v as "5" | "10" | "15")}
-              >
-                <SelectTrigger className="w-24 h-8 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="5">5</SelectItem>
-                  <SelectItem value="10">10</SelectItem>
-                  <SelectItem value="15">15</SelectItem>
-                </SelectContent>
-              </Select>
+        <div className="flex-1 flex flex-col items-center justify-center gap-8 px-8 py-6">
+
+          {/* Icon + heading */}
+          <div className="text-center space-y-2">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl border border-border/40 bg-card/40 backdrop-blur-sm mb-1">
+              <BookOpen className="w-7 h-7 text-chart-1" />
             </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground font-medium">Difficulty</p>
-              <Select
-                value={difficulty}
-                onValueChange={(v) => setDifficulty(v as Difficulty | "auto")}
-              >
-                <SelectTrigger className="w-28 h-8 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="auto">Auto</SelectItem>
-                  <SelectItem value="easy">Easy</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="hard">Hard</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <p className="text-base font-semibold text-foreground">Quiz</p>
+            <p className="text-xs text-muted-foreground/70 max-w-xs">
+              {history.length > 0
+                ? "Test your knowledge from this document."
+                : "AI-generated questions grounded in this document."}
+            </p>
           </div>
-          <Button onClick={handleGenerate} className="w-full">
-            Generate quiz
-          </Button>
-          <QuizHistory items={history} />
-        </div>
-      )}
 
-      {/* ── GENERATING: spinner ── */}
-      {state === "generating" && (
-        <div className="flex-1 flex flex-col items-center justify-center gap-3">
-          <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-          <p className="text-sm text-muted-foreground">Generating your quiz…</p>
-          <p className="text-sm text-muted-foreground">This may take a few moments.</p>
-        </div>
-      )}
+          {/* Error */}
+          {errorMsg && (
+            <p className="text-xs text-destructive text-center max-w-xs">{errorMsg}</p>
+          )}
 
-      {/* ── IN PROGRESS: questions ── */}
-      {state === "in_progress" && (
-        <div className="flex-1 flex flex-col min-h-0 gap-3">
-          <ScrollArea className="flex-1 min-h-0">
-            <div className="space-y-5 pr-2">
-              {questions.map((q, idx) => (
-                <div
-                  key={q.id}
-                  className="rounded-xl border border-border bg-card/40 p-4 space-y-2"
-                >
-                  <p className="text-xs text-muted-foreground font-medium">
-                    Question {idx + 1} of {questions.length}
-                  </p>
-                  <QuizQuestion
-                    question={q}
-                    value={answers[q.id]}
-                    onChange={(val) =>
-                      setAnswers((prev) => ({ ...prev, [q.id]: val }))
-                    }
-                    disabled={submitting}
-                  />
+          {/* Settings + generate */}
+          <div className="w-full max-w-xs space-y-4">
+            {/* Number of questions */}
+            <div className="space-y-2">
+              <p className="text-[11px] text-muted-foreground/60 font-medium text-center">Questions</p>
+              <div className="flex gap-2">
+                {(["5", "10", "15"] as const).map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setNumQuestions(n)}
+                    className={`flex-1 py-2 rounded-xl border text-sm font-medium transition-all cursor-pointer ${
+                      numQuestions === n
+                        ? "border-chart-1/60 bg-chart-1/20 text-foreground"
+                        : "border-border/40 bg-card/20 text-muted-foreground hover:border-border/60 hover:text-foreground"
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Difficulty */}
+            <div className="space-y-2">
+              <p className="text-[11px] text-muted-foreground/60 font-medium text-center">Difficulty</p>
+              <div className="flex gap-2">
+                {(["auto", "easy", "medium", "hard"] as const).map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setDifficulty(d)}
+                    className={`flex-1 py-2 rounded-xl border text-xs font-medium capitalize transition-all cursor-pointer ${
+                      difficulty === d
+                        ? "border-chart-1/60 bg-chart-1/20 text-foreground"
+                        : "border-border/40 bg-card/20 text-muted-foreground hover:border-border/60 hover:text-foreground"
+                    }`}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGenerate}
+              className="w-full py-2.5 rounded-xl bg-chart-1/80 hover:bg-chart-1 text-foreground text-sm font-medium transition-colors cursor-pointer"
+            >
+              Generate quiz
+            </button>
+          </div>
+
+          {/* Collapsible history */}
+          {history.length > 0 && (
+            <div className="w-full max-w-xs">
+              <button
+                type="button"
+                onClick={() => setShowHistory((v) => !v)}
+                className="w-full text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors cursor-pointer text-center"
+              >
+                {showHistory ? "Hide history" : `${history.length} past quiz${history.length !== 1 ? "zes" : ""}`}
+              </button>
+              {showHistory && (
+                <div className="mt-2 max-h-48 overflow-y-auto">
+                  <QuizHistory items={history} />
                 </div>
-              ))}
+              )}
             </div>
-          </ScrollArea>
-          <Button onClick={handleSubmit} disabled={submitting} className="shrink-0">
-            {submitting ? "Submitting…" : "Submit quiz"}
-          </Button>
+          )}
         </div>
       )}
 
-      {/* ── SUBMITTED: results ── */}
-      {state === "submitted" && result && (
-        <ScrollArea className="flex-1 min-h-0">
-          <div className="pr-2">
-            <QuizResult result={result} onGenerateNext={handleGenerateNext} />
+      {/* ── GENERATING ── */}
+      {state === "generating" && (
+        <div className="flex-1 flex flex-col items-center justify-center gap-4">
+          <div className="flex gap-1.5 items-center">
+            {[0, 1, 2].map((i) => (
+              <motion.span
+                key={i}
+                className="block w-2 h-2 rounded-full bg-chart-1/70"
+                animate={{ y: [0, -6, 0] }}
+                transition={{ duration: 0.9, delay: i * 0.18, repeat: Infinity, ease: "easeInOut" }}
+              />
+            ))}
           </div>
-        </ScrollArea>
-      )}
-
-      {/* ── ERROR: retry ── */}
-      {state === "error" && (
-        <div className="flex flex-col items-center gap-3 pt-4">
-          <Button variant="outline" onClick={handleGenerateNext}>
-            Back to setup
-          </Button>
+          <p className="text-sm text-muted-foreground">Generating your quiz…</p>
+          <p className="text-xs text-muted-foreground/50">This may take up to a minute.</p>
         </div>
       )}
+
+      {/* ── IN PROGRESS ── */}
+      {state === "in_progress" && (
+        <div className="flex-1 flex flex-col min-h-0 gap-3 p-5">
+          {/* Error */}
+          {errorMsg && (
+            <div className="shrink-0 px-4 py-2.5 rounded-xl border border-destructive/40 bg-destructive/10 text-xs text-destructive">
+              {errorMsg}
+            </div>
+          )}
+
+          {/* Progress */}
+          <div className="shrink-0 space-y-1.5">
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>{answeredCount} answered</span>
+              <span>{questions.length} total</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-border/30 overflow-hidden">
+              <div
+                className="h-full bg-chart-1/60 rounded-full transition-all duration-300"
+                style={{ width: `${questions.length ? (answeredCount / questions.length) * 100 : 0}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Questions */}
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-0.5">
+            {questions.map((q, idx) => (
+              <div
+                key={q.id}
+                className="rounded-2xl border border-border/50 bg-card/80 backdrop-blur-sm p-4 shadow-sm"
+              >
+                <p className="text-[11px] text-muted-foreground/60 font-medium mb-2.5 uppercase tracking-wide">Q{idx + 1}</p>
+                <QuizQuestion
+                  question={q}
+                  value={answers[q.id]}
+                  onChange={(val) => setAnswers((prev) => ({ ...prev, [q.id]: val }))}
+                  disabled={submitting}
+                />
+              </div>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="shrink-0 w-full py-2.5 rounded-xl bg-chart-1/80 hover:bg-chart-1 text-foreground text-sm font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {submitting ? "Submitting…" : `Submit quiz (${answeredCount}/${questions.length})`}
+          </button>
+        </div>
+      )}
+
+      {/* ── SUBMITTED ── */}
+      {state === "submitted" && result && (
+        <div className="flex-1 min-h-0 overflow-y-auto px-5 pr-4">
+          <QuizResult result={result} onGenerateNext={handleGenerateNext} onBack={handleBack} />
+        </div>
+      )}
+
+      {/* ── ERROR ── */}
+      {state === "error" && (
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 p-5">
+          {errorMsg && (
+            <p className="text-xs text-destructive text-center max-w-xs">{errorMsg}</p>
+          )}
+          <button
+            type="button"
+            onClick={handleBack}
+            className="px-6 py-2.5 rounded-xl border border-border/40 bg-card/30 text-sm text-foreground hover:bg-card/50 cursor-pointer transition-colors"
+          >
+            Back to setup
+          </button>
+        </div>
+      )}
+
     </div>
   )
 }

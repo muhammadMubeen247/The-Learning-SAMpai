@@ -30,8 +30,8 @@ logger = logging.getLogger("mindmap")
 # Env-tunable constants
 # ---------------------------------------------------------------------------
 
-MAX_DEPTH = int(os.getenv("MINDMAP_MAX_DEPTH", "4"))
-MAX_CHILDREN_PER_NODE = int(os.getenv("MINDMAP_MAX_CHILDREN_PER_NODE", "6"))
+MAX_DEPTH = int(os.getenv("MINDMAP_MAX_DEPTH", "5"))
+MAX_CHILDREN_PER_NODE = int(os.getenv("MINDMAP_MAX_CHILDREN_PER_NODE", "7"))
 GENERATION_MODEL = os.getenv("MINDMAP_GENERATION_MODEL", "gpt-4o-mini")
 
 # RAG retrieval settings for tree generation
@@ -95,7 +95,7 @@ class RootTopic(BaseModel):
 class MindmapNode(BaseModel):
     topic: str = Field(min_length=2, max_length=120)
     description: str = Field(min_length=20, max_length=400)
-    children: list["MindmapNode"] = Field(default_factory=list, max_length=6)
+    children: list["MindmapNode"] = Field(default_factory=list, max_length=7)
 
 
 # Must be called after the class body so the self-referencing forward ref
@@ -123,22 +123,26 @@ def assemble_tree(root: RootTopic, payload: MindmapTreePayload) -> dict:
 
     def assign_ids(node: MindmapNode, depth: int) -> dict:
         nid = f"n_{next(counter):04d}"
+        children = [assign_ids(c, depth + 1) for c in node.children]
         return {
             "id": nid,
             "topic": node.topic.strip(),
             "description": node.description.strip(),
             "depth": depth,
-            "children": [assign_ids(c, depth + 1) for c in node.children],
+            "has_children": len(children) > 0,
+            "children": children,
         }
 
+    root_children = [assign_ids(c, 1) for c in payload.children]
     return {
-        "version": 1,
+        "version": 2,
         "root": {
             "id": "n_root",
             "topic": root.topic.strip(),
             "description": root.description.strip(),
             "depth": 0,
-            "children": [assign_ids(c, 1) for c in payload.children],
+            "has_children": len(root_children) > 0,
+            "children": root_children,
         },
     }
 
@@ -224,17 +228,25 @@ async def build_mindmap_tree(engine: Any, file: Any) -> tuple[dict, dict]:
 
     # ── Step 3: Generate hierarchical tree ───────────────────────────────
     tree_system = (
-        f"You build hierarchical mindmaps from study material. "
-        f"Output a tree of topics with the central topic \"{root.topic}\" as the implicit root.\n\n"
-        f"Constraints:\n"
-        f"- Root has 2-8 direct children (top-level branches).\n"
-        f"- Each non-leaf has 2-{MAX_CHILDREN_PER_NODE} children.\n"
-        f"- Maximum tree depth is {MAX_DEPTH} levels below the root.\n"
-        f"- Each topic is a 2-5 word noun phrase, no verbs, no questions.\n"
-        f"- Each description is 1-2 sentences, drawn strictly from the document.\n"
-        f"- Do NOT invent topics absent from the document.\n"
-        f"- Prefer breadth at level 1 (major sub-topics) and depth at deeper levels.\n"
-        f"- Skip a level rather than padding with redundant siblings.\n\n"
+        f"You are building a hierarchical mindmap from study material. "
+        f"Output a topic tree with \"{root.topic}\" as the implicit root.\n\n"
+        f"STRUCTURE RULES:\n"
+        f"- Root has 2-8 direct children (the major themes or sections of the document).\n"
+        f"- Each non-leaf node has 2-{MAX_CHILDREN_PER_NODE} children.\n"
+        f"- Maximum tree depth is {MAX_DEPTH} levels below the root.\n\n"
+        f"DEPTH RULES (most important):\n"
+        f"- Expand every branch until its leaves are CONCRETE, ATOMIC CONCEPTS:\n"
+        f"  a specific technique, algorithm, definition, mechanism, formula, or example.\n"
+        f"  NEVER leave an abstract category (e.g. 'Types', 'Concepts', 'Examples') as a leaf.\n"
+        f"- Target depth 3-4 for substantive topics. Use depth 1-2 ONLY when a branch\n"
+        f"  genuinely has very few distinct sub-topics in the source material.\n\n"
+        f"EXAMPLE of correct depth (virtualization topic):\n"
+        f"  'CPU Virtualisation' → 'Hardware Assistance' → 'Intel VT-x' → 'VMCS Structure'\n"
+        f"  (each leaf is a concrete mechanism, not a category)\n\n"
+        f"CONTENT RULES:\n"
+        f"- Each topic: 2-6 word noun phrase, no verbs, no questions.\n"
+        f"- Each description: 1-2 sentences drawn strictly from the document.\n"
+        f"- Do NOT invent topics absent from the source material.\n\n"
         f"Output JSON only."
     )
 
@@ -243,13 +255,13 @@ async def build_mindmap_tree(engine: Any, file: Any) -> tuple[dict, dict]:
             model=GENERATION_MODEL,
             messages=[
                 {"role": "system", "content": tree_system},
-                {"role": "user", "content": f"DOCUMENT CONTEXT:\n{raw_context[:18000]}"},
+                {"role": "user", "content": f"DOCUMENT CONTEXT:\n{raw_context[:32000]}"},
             ],
             response_model=MindmapTreePayload,
             temperature=0.3,
             max_retries=2,
         ),
-        timeout=90.0,
+        timeout=180.0,
     )
     payload: MindmapTreePayload = tree_resp  # type: ignore[assignment]
     if hasattr(tree_resp, "_raw_response"):

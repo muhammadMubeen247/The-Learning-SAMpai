@@ -12,6 +12,7 @@ export interface MindmapNodeData {
   topic: string;
   description: string;
   depth: number;
+  has_children?: boolean;
   children: MindmapNodeData[];
 }
 

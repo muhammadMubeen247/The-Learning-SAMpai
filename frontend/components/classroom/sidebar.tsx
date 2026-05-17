@@ -5,11 +5,9 @@ import { useRouter } from "next/navigation"
 import { Home, ChevronDown, Folder } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import AnimatedList from "@/components/backgrounds/animated-list"
-import DotGrid from "@/components/backgrounds/dot-grid"
 import API from "@/api/axios"
 import { useCurrentUser, type CurrentUser } from "@/hooks/use-current-user"
 import { cn } from "@/lib/utils"
-import { useTheme } from "@/hooks/use-theme"
 type Classroom = {
   id: number
   name: string
@@ -57,15 +55,10 @@ export default function ClassroomSidebar({
 }: ClassroomSidebarProps) {
   const router = useRouter()
   const { user } = useCurrentUser()
-  const { theme } = useTheme()
   const [classrooms, setClassrooms] = useState<Classroom[]>([])
   const [loading, setLoading] = useState(true)
   const [joinedExpanded, setJoinedExpanded] = useState(true)
   const [filesExpanded, setFilesExpanded] = useState(true)
-
-  // Theme-appropriate colors for Squares background
-  const borderColor = theme === "dark" ? "rgba(147, 197, 253, 0.3)" : "rgba(56, 189, 248, 0.4)"
-  const hoverFillColor = theme === "dark" ? "rgba(147, 197, 253, 0.1)" : "rgba(56, 189, 248, 0.15)"
 
   const fetchClassrooms = async () => {
     setLoading(true)
@@ -119,23 +112,6 @@ export default function ClassroomSidebar({
       className="fixed left-0 top-16 w-[280px] h-[calc(100vh-4rem)] shrink-0 border-r bg-card/70 backdrop-blur-md border-border overflow-hidden flex flex-col z-40"
       style={{ pointerEvents: collapsed ? "none" : "auto" }}
     >
-
-      {/* Background */}
-      <div className="absolute inset-0 -z-0 opacity-35 pointer-events-none">
-        <DotGrid
-          className="absolute inset-0 p-0 pointer-events-none"
-          style={{ width: "100%", height: "100%" }}
-          dotSize={10}
-          gap={18}
-          baseColor="#334155"
-          activeColor="#64748b"
-          proximity={120}
-          shockRadius={220}
-          shockStrength={4}
-          resistance={700}
-          returnDuration={1.4}
-        />
-      </div>
 
       {/* Home/Folder Button */}
       <div className="relative z-10 px-4 py-4 border-b border-border">

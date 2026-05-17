@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { useParams, useRouter, usePathname } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useParams, useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
 import API from "@/api/axios"
 import { useCurrentUser, type CurrentUser } from "@/hooks/use-current-user"
@@ -16,7 +16,6 @@ import GroupChatsTab from "@/components/classroom/group-chats-tab"
 import { LoadingOverlay } from "@/components/ui/liquid-orb-loader"
 
 const Squares = dynamic(() => import("@/components/backgrounds/squares"), { ssr: false })
-const Plasma = dynamic(() => import("@/components/backgrounds/plasma"), { ssr: false })
 
 type Classroom = {
   id: number
@@ -34,7 +33,6 @@ type Classroom = {
 export default function ClassroomPage() {
   const params = useParams()
   const router = useRouter()
-  const pathname = usePathname()
   const classroomId = parseInt(params.id as string, 10)
   const { user, loading: userLoading, setUser } = useCurrentUser()
   const { theme } = useTheme()
@@ -104,7 +102,6 @@ export default function ClassroomPage() {
   // Theme-appropriate colors for Squares background
   const borderColor = theme === "dark" ? "rgba(147, 197, 253, 0.3)" : "rgba(56, 189, 248, 0.4)"
   const hoverFillColor = theme === "dark" ? "rgba(147, 197, 253, 0.1)" : "rgba(56, 189, 248, 0.15)"
-  const plasmaColor = theme === "dark" ? "#60a5fa" : "#3b82f6"
 
   if (loading || userLoading) {
     return (
@@ -197,48 +194,38 @@ export default function ClassroomPage() {
 
           {/* Tab content */}
           {activeTab === "files" ? (
-            <>
-              {/* Folders Section with Squares Background */}
-              <div className="relative flex-1 overflow-hidden">
-                <div className="absolute inset-0 opacity-60 pointer-events-none z-0">
-                  <Squares
-                    speed={0.5}
-                    squareSize={40}
-                    direction="diagonal"
-                    borderColor={borderColor}
-                    hoverFillColor={hoverFillColor}
-                  />
-                </div>
-                <div className="relative z-10 h-full overflow-y-auto overflow-x-hidden">
-                  <FoldersSection
-                    classroomId={classroomId}
-                    isOwner={isOwner ?? false}
-                    onFolderCreated={() => {}}
-                  />
-                </div>
+            <div className="relative flex-1 overflow-hidden">
+              {/* Single Squares background for entire files tab */}
+              <div className="absolute inset-0 opacity-60 pointer-events-none z-0">
+                <Squares
+                  speed={0.5}
+                  squareSize={40}
+                  direction="diagonal"
+                  borderColor={borderColor}
+                  hoverFillColor={hoverFillColor}
+                />
               </div>
 
-              {/* Announcements Section with Plasma Background */}
-              <div className="relative border-t border-border overflow-hidden">
-                <div
-                  className="absolute bottom-0 left-0 right-0 opacity-80 pointer-events-none z-0"
-                  style={{ height: "50vh", maxHeight: "50vh", width: "100%", top: "auto" }}
-                >
-                  <Plasma
-                    key={`plasma-${pathname}`}
-                    color={plasmaColor}
-                    speed={0.6}
-                    direction="forward"
-                    scale={1.08}
-                    opacity={0.6}
-                    mouseInteractive={false}
-                  />
-                </div>
-                <div className="relative z-10">
-                  <AnnouncementsSection isOwner={isOwner ?? false} />
+              {/* Scrollable page — folders then announcements panel */}
+              <div className="relative z-10 h-full overflow-y-auto overflow-x-hidden">
+                <FoldersSection
+                  classroomId={classroomId}
+                  isOwner={isOwner ?? false}
+                  onFolderCreated={() => {}}
+                />
+
+                {/* Fixed-height announcements panel — sits below folders, scrollable inside */}
+                <div className="px-4 sm:px-6 md:px-8 pb-8">
+                  <div className="h-[420px]">
+                    <AnnouncementsSection
+                      classroomId={classroomId}
+                      isOwner={isOwner ?? false}
+                      currentUserId={user?.id ?? 0}
+                    />
+                  </div>
                 </div>
               </div>
-            </>
+            </div>
           ) : (
             <div className="relative flex-1 overflow-hidden">
               <div className="absolute inset-0 opacity-60 pointer-events-none z-0">

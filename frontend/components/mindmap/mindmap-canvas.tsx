@@ -1,21 +1,22 @@
 /**
- * MindmapCanvas — the React Flow canvas that renders the mindmap tree.
+ * MindmapCanvas — React Flow canvas with per-node expand/collapse.
  *
- * Props:
- *   root        — MindmapNodeData (tree_data.root)
- *   activeNodeId — currently selected node (highlight ring)
- *   onNodeClick — fired when a non-root node is clicked
+ * Architecture:
+ *   MindmapCanvas  — owns expandedIds state + useNodesState/useEdgesState
+ *     └─ ReactFlow
+ *          └─ FlowContent  — uses useReactFlow() for fitView/zoom, re-builds
+ *                            layout when expandedIds changes, renders toolbar
  */
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ReactFlow,
   Background,
-  Controls,
-  MiniMap,
+  Panel,
   useNodesState,
   useEdgesState,
+  useReactFlow,
   type Node,
   type Edge,
 } from "@xyflow/react";
@@ -23,9 +24,122 @@ import "@xyflow/react/dist/style.css";
 
 import type { MindmapNodeData } from "@/api/mindmap";
 import MindmapNodeComponent from "./mindmap-node";
-import { buildFlow, type FlowNodeData } from "./layout";
+import MindmapToolbar from "./mindmap-toolbar";
+import {
+  buildFlow,
+  collectExpandableIds,
+  collectDescendantIds,
+  type FlowNodeData,
+} from "./layout";
 
 const nodeTypes = { mindmapNode: MindmapNodeComponent };
+
+// ── Inner component — has access to ReactFlow context ────────────────────────
+
+interface FlowContentProps {
+  root: MindmapNodeData;
+  expandedIds: Set<string>;
+  setExpandedIds: React.Dispatch<React.SetStateAction<Set<string>>>;
+  activeNodeId: string | null;
+  onNodeClick: (nodeId: string, label: string) => void;
+  setNodes: (
+    update:
+      | Node<FlowNodeData>[]
+      | ((prev: Node<FlowNodeData>[]) => Node<FlowNodeData>[])
+  ) => void;
+  setEdges: (update: Edge[] | ((prev: Edge[]) => Edge[])) => void;
+}
+
+function FlowContent({
+  root,
+  expandedIds,
+  setExpandedIds,
+  activeNodeId,
+  onNodeClick,
+  setNodes,
+  setEdges,
+}: FlowContentProps) {
+  const { fitView } = useReactFlow();
+
+  const { nodes: flowNodes, edges: flowEdges } = useMemo(
+    () => buildFlow(root, expandedIds),
+    [root, expandedIds]
+  );
+
+  const onToggleExpand = useCallback(
+    (id: string) => {
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) {
+          next.delete(id);
+          const descendants = collectDescendantIds(root, id);
+          for (const did of descendants) next.delete(did);
+        } else {
+          next.add(id);
+        }
+        return next;
+      });
+    },
+    [root, setExpandedIds]
+  );
+
+  const injectCallbacks = useCallback(
+    (raw: Node<FlowNodeData>[]): Node<FlowNodeData>[] =>
+      raw.map((n) => ({
+        ...n,
+        selected: n.id === activeNodeId,
+        data: {
+          ...n.data,
+          onExplore: (id: string) => onNodeClick(id, n.data.label),
+          onToggleExpand,
+        },
+      })),
+    [activeNodeId, onNodeClick, onToggleExpand]
+  );
+
+  // Full re-layout when the visible node set changes
+  useEffect(() => {
+    setNodes(injectCallbacks(flowNodes));
+    setEdges(flowEdges);
+    // Allow React to commit then fit
+    setTimeout(() => fitView({ padding: 0.2, duration: 400 }), 60);
+  }, [flowNodes, flowEdges]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-apply callbacks when selection or handlers change (no re-layout)
+  useEffect(() => {
+    setNodes((prev) => injectCallbacks(prev));
+  }, [activeNodeId, injectCallbacks]);
+
+  const isFullyExpanded = useMemo(() => {
+    const allIds = collectExpandableIds(root);
+    return allIds.size > 0 && [...allIds].every((id) => expandedIds.has(id));
+  }, [root, expandedIds]);
+
+  const onExpandAll = useCallback(() => {
+    setExpandedIds(collectExpandableIds(root));
+    setTimeout(() => fitView({ padding: 0.1, duration: 600 }), 60);
+  }, [root, setExpandedIds, fitView]);
+
+  const onCollapseAll = useCallback(() => {
+    setExpandedIds(new Set());
+    setTimeout(() => fitView({ padding: 0.2, duration: 400 }), 60);
+  }, [setExpandedIds, fitView]);
+
+  return (
+    <>
+      <Background gap={16} size={1} color="rgba(96,165,250,0.1)" />
+      <Panel position="bottom-right" style={{ marginBottom: 12, marginRight: 12 }}>
+        <MindmapToolbar
+          isFullyExpanded={isFullyExpanded}
+          onExpandAll={onExpandAll}
+          onCollapseAll={onCollapseAll}
+        />
+      </Panel>
+    </>
+  );
+}
+
+// ── Public canvas component ───────────────────────────────────────────────────
 
 interface MindmapCanvasProps {
   root: MindmapNodeData;
@@ -38,40 +152,13 @@ export default function MindmapCanvas({
   activeNodeId,
   onNodeClick,
 }: MindmapCanvasProps) {
-  const { nodes: initialNodes, edges: initialEdges } = useMemo(
-    () => buildFlow(root),
-    [root]
+  // Root pre-expanded so users immediately see top-level branches
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(
+    () => new Set(["n_root"])
   );
 
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node<FlowNodeData>>(
-    []
-  );
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node<FlowNodeData>>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
-
-  // Inject onExplore callback + selected state into node data
-  const injectCallbacks = useCallback(
-    (raw: Node<FlowNodeData>[]): Node<FlowNodeData>[] =>
-      raw.map((n) => ({
-        ...n,
-        selected: n.id === activeNodeId,
-        data: {
-          ...n.data,
-          onExplore: (id: string) => onNodeClick(id, n.data.label),
-        },
-      })),
-    [activeNodeId, onNodeClick]
-  );
-
-  // Re-layout when tree changes
-  useEffect(() => {
-    setNodes(injectCallbacks(initialNodes));
-    setEdges(initialEdges);
-  }, [initialNodes, initialEdges]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Update selected state without full re-layout
-  useEffect(() => {
-    setNodes((prev) => injectCallbacks(prev));
-  }, [activeNodeId, injectCallbacks]);
 
   return (
     <div className="w-full h-full">
@@ -81,27 +168,23 @@ export default function MindmapCanvas({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         nodeTypes={nodeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.15 }}
-        minZoom={0.2}
-        maxZoom={2}
+        minZoom={0.1}
+        maxZoom={2.5}
         proOptions={{ hideAttribution: true }}
+        defaultEdgeOptions={{
+          type: "default",
+          style: { stroke: "#60a5fa", strokeWidth: 1.5, opacity: 0.55 },
+          animated: false,
+        }}
       >
-        <Background gap={16} size={1} color="rgba(139,92,246,0.12)" />
-        <Controls
-          showInteractive={false}
-          className="!bg-background !border-border !shadow-sm"
-        />
-        <MiniMap
-          nodeColor={(n) => {
-            const depth = (n.data as FlowNodeData).depth;
-            if (depth === 0) return "#7c3aed";
-            if (depth === 1) return "#a78bfa";
-            return "#c4b5fd";
-          }}
-          pannable
-          zoomable
-          className="!bg-background/80 !border-border !rounded-lg"
+        <FlowContent
+          root={root}
+          expandedIds={expandedIds}
+          setExpandedIds={setExpandedIds}
+          activeNodeId={activeNodeId}
+          onNodeClick={onNodeClick}
+          setNodes={setNodes}
+          setEdges={setEdges}
         />
       </ReactFlow>
     </div>

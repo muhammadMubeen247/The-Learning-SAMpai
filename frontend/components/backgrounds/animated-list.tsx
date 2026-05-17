@@ -26,8 +26,8 @@ const AnimatedItem = ({
       data-index={index}
       onMouseEnter={onMouseEnter}
       onClick={onClick}
-      initial={{ scale: 0.7, opacity: 0 }}
-      animate={inView ? { scale: 1, opacity: 1 } : { scale: 0.7, opacity: 0 }}
+      initial={{ scale: 0.85, opacity: 0 }}
+      animate={inView ? { scale: 1, opacity: 1 } : { scale: 0.9, opacity: 0.35 }}
       transition={{ duration: 0.2, delay }}
       className="mb-3 cursor-pointer"
     >
@@ -38,6 +38,7 @@ const AnimatedItem = ({
 
 type AnimatedListProps = {
   items: string[]
+  renderItem?: (item: string, index: number, isSelected: boolean) => React.ReactNode
   onItemSelect?: (item: string, index: number) => void
   showGradients?: boolean
   enableArrowNavigation?: boolean
@@ -49,6 +50,7 @@ type AnimatedListProps = {
 
 const AnimatedList = ({
   items = [],
+  renderItem,
   onItemSelect,
   showGradients = true,
   enableArrowNavigation = true,
@@ -148,13 +150,17 @@ const AnimatedList = ({
               onItemSelect?.(item, index)
             }}
           >
-            <div
-              className={`p-3 rounded-lg border transition-colors ${
-                selectedIndex === index ? "bg-card/80 border-border" : "bg-card/50 hover:bg-card/70 border-border/50"
-              } ${itemClassName}`}
-            >
-              <p className="text-sm text-foreground m-0">{item}</p>
-            </div>
+            {renderItem ? (
+              renderItem(item, index, selectedIndex === index)
+            ) : (
+              <div
+                className={`p-3 rounded-lg border transition-colors ${
+                  selectedIndex === index ? "bg-card/80 border-border" : "bg-card/50 hover:bg-card/70 border-border/50"
+                } ${itemClassName}`}
+              >
+                <p className="text-sm text-foreground m-0">{item}</p>
+              </div>
+            )}
           </AnimatedItem>
         ))}
       </div>
@@ -162,11 +168,11 @@ const AnimatedList = ({
       {showGradients && (
         <>
           <div
-            className="pointer-events-none absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-background to-transparent transition-opacity"
+            className="pointer-events-none absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-background/60 to-transparent transition-opacity"
             style={{ opacity: topGradientOpacity }}
           />
           <div
-            className="pointer-events-none absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-background to-transparent transition-opacity"
+            className="pointer-events-none absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-background/60 to-transparent transition-opacity"
             style={{ opacity: bottomGradientOpacity }}
           />
         </>

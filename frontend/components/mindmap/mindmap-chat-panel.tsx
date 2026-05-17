@@ -1,24 +1,10 @@
-/**
- * MindmapChatPanel — the right-hand chat sidebar for the mindmap page.
- *
- * Features:
- * - Shows per-node summary when a node is clicked (via MARKER + ASSISTANT rows)
- * - Shows conversational follow-up messages
- * - Polls until all pending messages are resolved
- * - "Ask a question..." input at the bottom
- */
 "use client";
 
 import { useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Loader2, Send, Trash2 } from "lucide-react";
-
+import { Loader2, Send, Trash2, X } from "lucide-react";
 import type { ChatMessage } from "@/api/mindmap";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
 
 interface MindmapChatPanelProps {
   messages: ChatMessage[];
@@ -26,6 +12,7 @@ interface MindmapChatPanelProps {
   activeNodeLabel: string | null;
   onAsk: (content: string) => void;
   onClear: () => void;
+  onClose: () => void;
   inputValue: string;
   setInputValue: (v: string) => void;
 }
@@ -38,18 +25,39 @@ function isMarker(msg: ChatMessage): boolean {
   return msg.role === "marker";
 }
 
+const mdComponents = {
+  p: ({ children }: { children: React.ReactNode }) => (
+    <p className="mb-1 last:mb-0 leading-relaxed">{children}</p>
+  ),
+  ul: ({ children }: { children: React.ReactNode }) => (
+    <ul className="list-disc pl-4 mb-1 space-y-0.5">{children}</ul>
+  ),
+  ol: ({ children }: { children: React.ReactNode }) => (
+    <ol className="list-decimal pl-4 mb-1 space-y-0.5">{children}</ol>
+  ),
+  li: ({ children }: { children: React.ReactNode }) => <li>{children}</li>,
+  code: ({ children }: { children: React.ReactNode }) => (
+    <code className="bg-black/10 dark:bg-white/10 px-1 py-0.5 rounded text-xs font-mono">
+      {children}
+    </code>
+  ),
+  strong: ({ children }: { children: React.ReactNode }) => (
+    <strong className="font-semibold">{children}</strong>
+  ),
+};
+
 export default function MindmapChatPanel({
   messages,
   isSending,
   activeNodeLabel,
   onAsk,
   onClear,
+  onClose,
   inputValue,
   setInputValue,
 }: MindmapChatPanelProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom when messages change
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -57,8 +65,10 @@ export default function MindmapChatPanel({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (inputValue.trim()) onAsk(inputValue.trim());
-      setInputValue("");
+      if (inputValue.trim()) {
+        onAsk(inputValue.trim());
+        setInputValue("");
+      }
     }
   };
 
@@ -72,35 +82,44 @@ export default function MindmapChatPanel({
   const visibleMessages = messages.filter((m) => !isMarker(m));
 
   return (
-    <div className="flex flex-col h-full border-l border-border bg-background">
+    <div className="flex flex-col h-full bg-card/20 backdrop-blur-sm">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold truncate">
-            {activeNodeLabel ? `Exploring: ${activeNodeLabel}` : "Chat"}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border/30 shrink-0">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-foreground truncate">
+            {activeNodeLabel ? activeNodeLabel : "Mind Map Chat"}
           </p>
-          <p className="text-xs text-muted-foreground">
-            Click a node to explore it
+          <p className="text-[11px] text-muted-foreground/60">
+            {activeNodeLabel ? "Click a node to explore another" : "Click any node to explore it"}
           </p>
         </div>
-        {visibleMessages.length > 0 && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="shrink-0 text-muted-foreground hover:text-destructive"
-            onClick={onClear}
-            title="Clear chat"
+        <div className="flex items-center gap-1 shrink-0">
+          {visibleMessages.length > 0 && (
+            <button
+              type="button"
+              onClick={onClear}
+              title="Clear chat"
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            title="Close chat"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground/60 hover:text-foreground hover:bg-card/50 transition-colors cursor-pointer"
           >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        )}
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="flex flex-col gap-3 p-4">
           {visibleMessages.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center mt-8">
+            <p className="text-xs text-muted-foreground/50 text-center mt-10 leading-relaxed">
               Click a node on the map to get an AI-generated summary, then ask
               follow-up questions here.
             </p>
@@ -110,39 +129,43 @@ export default function MindmapChatPanel({
           ))}
           <div ref={bottomRef} />
         </div>
-      </ScrollArea>
+      </div>
 
       {/* Input */}
-      <div className="shrink-0 border-t border-border p-3">
-        <div className="flex gap-2 items-end">
-          <Textarea
+      <div className="shrink-0 border-t border-border/30 p-3">
+        <div className="flex items-end gap-2 bg-card/40 backdrop-blur-md border border-border/40 rounded-2xl p-2">
+          <textarea
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ask a follow-up question…"
-            className="resize-none text-sm min-h-[40px] max-h-[120px]"
             rows={1}
             disabled={isSending}
+            className="flex-1 resize-none bg-transparent px-2 py-1.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed overflow-y-auto"
+            style={{ maxHeight: 100, fieldSizing: "content" } as React.CSSProperties}
           />
-          <Button
-            size="icon"
+          <button
+            type="button"
             onClick={handleSend}
             disabled={isSending || !inputValue.trim()}
-            className="shrink-0"
+            className="shrink-0 flex items-center justify-center w-8 h-8 rounded-xl bg-chart-1/80 hover:bg-chart-1 text-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
           >
             {isSending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
-              <Send className="h-4 w-4" />
+              <Send className="h-3.5 w-3.5" />
             )}
-          </Button>
+          </button>
         </div>
+        <p className="mt-1 text-[10px] text-muted-foreground/40 px-2">
+          Enter · send · Shift+Enter · new line
+        </p>
       </div>
     </div>
   );
 }
 
-// ── Individual message bubble ─────────────────────────────────────────────
+// ── Message bubble ────────────────────────────────────────────────────────────
 
 function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user";
@@ -151,7 +174,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   if (isUser) {
     return (
       <div className="flex justify-end">
-        <div className="bg-violet-600 text-white rounded-2xl rounded-tr-sm px-3 py-2 max-w-[85%] text-sm">
+        <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-chart-1/25 backdrop-blur-md border border-chart-1/20 px-3 py-2 text-sm text-foreground">
           {message.content}
         </div>
       </div>
@@ -161,11 +184,9 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   return (
     <div className="flex justify-start">
       <div
-        className={cn(
-          "rounded-2xl rounded-tl-sm px-3 py-2 max-w-[92%] text-sm",
-          "bg-muted text-foreground",
-          pending && "opacity-60"
-        )}
+        className={`max-w-[92%] rounded-2xl rounded-bl-sm px-3 py-2 text-sm bg-card/60 backdrop-blur-sm border border-border/40 text-foreground ${
+          pending ? "opacity-60" : ""
+        }`}
       >
         {pending ? (
           <span className="flex items-center gap-2 text-muted-foreground text-xs">
@@ -173,28 +194,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
             Generating summary…
           </span>
         ) : (
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            components={{
-              p: ({ children }) => (
-                <p className="mb-1 last:mb-0 leading-relaxed">{children}</p>
-              ),
-              ul: ({ children }) => (
-                <ul className="list-disc pl-4 mb-1">{children}</ul>
-              ),
-              ol: ({ children }) => (
-                <ol className="list-decimal pl-4 mb-1">{children}</ol>
-              ),
-              code: ({ children }) => (
-                <code className="bg-muted-foreground/20 px-1 rounded text-xs font-mono">
-                  {children}
-                </code>
-              ),
-              strong: ({ children }) => (
-                <strong className="font-semibold">{children}</strong>
-              ),
-            }}
-          >
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents as never}>
             {message.content}
           </ReactMarkdown>
         )}

@@ -69,6 +69,7 @@ from app.database.init_db import init_db
 from app.routes import auth, classroom, folder, file, chat, quiz, flashcards as flashcards_router
 from app.routes import group_chat as group_chat_router
 from app.routes import mindmap as mindmap_router
+from app.routes import announcements as announcements_router
 
 
 async def _load_sampai_user_id(app: FastAPI) -> None:
@@ -204,6 +205,7 @@ app.include_router(quiz.router)
 app.include_router(flashcards_router.router)
 app.include_router(group_chat_router.router)
 app.include_router(mindmap_router.router)
+app.include_router(announcements_router.router)
 
 
 @app.get("/")

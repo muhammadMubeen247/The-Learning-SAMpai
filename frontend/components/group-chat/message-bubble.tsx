@@ -15,6 +15,29 @@ type Props = {
   onScrollTo?: (messageId: number) => void
 }
 
+const mdComponents = {
+  p: ({ children }: { children: React.ReactNode }) => (
+    <p className="mb-1 last:mb-0 leading-relaxed">{children}</p>
+  ),
+  strong: ({ children }: { children: React.ReactNode }) => (
+    <strong className="font-semibold">{children}</strong>
+  ),
+  em: ({ children }: { children: React.ReactNode }) => <em className="italic">{children}</em>,
+  ul: ({ children }: { children: React.ReactNode }) => (
+    <ul className="list-disc pl-4 mb-1 space-y-0.5">{children}</ul>
+  ),
+  ol: ({ children }: { children: React.ReactNode }) => (
+    <ol className="list-decimal pl-4 mb-1 space-y-0.5">{children}</ol>
+  ),
+  li: ({ children }: { children: React.ReactNode }) => <li>{children}</li>,
+  code: ({ children }: { children: React.ReactNode }) => (
+    <code className="bg-black/15 dark:bg-white/10 px-1 py-0.5 rounded text-xs font-mono">{children}</code>
+  ),
+  blockquote: ({ children }: { children: React.ReactNode }) => (
+    <blockquote className="border-l-2 border-violet-400/60 pl-3 italic text-foreground/70">{children}</blockquote>
+  ),
+}
+
 function renderMentions(content: string): React.ReactNode[] {
   const parts = content.split(/(@\w+)/g)
   return parts.map((part, i) => {
@@ -25,8 +48,8 @@ function renderMentions(content: string): React.ReactNode[] {
           key={i}
           className={`inline-block px-1 rounded text-xs font-semibold ${
             isAgent
-              ? "bg-violet-500/20 text-violet-400"
-              : "bg-blue-500/20 text-blue-400"
+              ? "bg-violet-500/20 text-violet-600 dark:text-violet-400"
+              : "bg-blue-500/20 text-blue-600 dark:text-blue-400"
           }`}
         >
           {part}
@@ -123,15 +146,15 @@ export function MessageBubble({
               message.is_discarded
                 ? "opacity-50 line-through bg-muted/30 text-muted-foreground"
                 : isAgent
-                ? "bg-violet-900/40 text-foreground border border-violet-500/30"
+                ? "bg-violet-500/15 backdrop-blur-md border border-violet-400/30 text-foreground"
                 : isMe
-                ? "bg-blue-600 text-white"
-                : "bg-muted text-foreground"
+                ? "bg-chart-1/25 backdrop-blur-md border border-chart-1/20 text-foreground"
+                : "bg-card/50 backdrop-blur-md border border-border/40 text-foreground"
             }`}
           >
             {isAgent ? (
-              <div className="prose prose-sm dark:prose-invert max-w-none">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <div className="text-sm text-foreground">
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents as never}>
                   {message.content}
                 </ReactMarkdown>
               </div>

@@ -34,6 +34,7 @@ export function useMindmap({
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isMounted = useRef(true);
+  const didAutoRegen = useRef(false);
 
   useEffect(() => {
     isMounted.current = true;
@@ -62,6 +63,15 @@ export function useMindmap({
           setIsLoading(false);
           if (data.status === "failed") {
             setError(data.error_message ?? "Mindmap generation failed.");
+          }
+          // Auto-regen if tree is from the old schema (version < 2)
+          if (
+            data.status === "ready" &&
+            !didAutoRegen.current &&
+            ((data.tree_data?.version ?? 0) < 2)
+          ) {
+            didAutoRegen.current = true;
+            generate(true);
           }
         }
       } catch {
@@ -118,12 +128,17 @@ export function useMindmap({
         if (cancelled) return;
         setMindmap(data);
         setStatus(data.status);
-        if (
-          data.status === "pending" ||
-          data.status === "generating"
-        ) {
+        if (data.status === "pending" || data.status === "generating") {
           setIsLoading(true);
           startPolling();
+        } else if (
+          data.status === "ready" &&
+          !didAutoRegen.current &&
+          ((data.tree_data?.version ?? 0) < 2)
+        ) {
+          // Stale tree from old schema — regenerate once
+          didAutoRegen.current = true;
+          generate(true);
         }
       } catch (err: unknown) {
         if (cancelled) return;

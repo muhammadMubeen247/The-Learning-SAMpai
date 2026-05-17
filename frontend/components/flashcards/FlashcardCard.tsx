@@ -2,15 +2,35 @@
 
 import { useEffect, useRef, useState } from "react"
 import { motion } from "framer-motion"
-import { Button } from "@/components/ui/button"
 import { type CardPublic, type ReviewResult } from "@/api/flashcards"
 
 const TYPE_COLORS: Record<string, string> = {
-  definition: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-  concept: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
-  example: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-  formula: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+  definition: "border-blue-400/40 bg-blue-500/10 text-blue-600 dark:text-blue-300",
+  concept: "border-purple-400/40 bg-purple-500/10 text-purple-600 dark:text-purple-300",
+  example: "border-amber-400/40 bg-amber-500/10 text-amber-600 dark:text-amber-300",
+  formula: "border-emerald-400/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300",
 }
+
+const REVIEW_BUTTONS: { result: ReviewResult; label: string; key: string; cls: string }[] = [
+  {
+    result: "forgot",
+    label: "Forgot",
+    key: "1",
+    cls: "border-red-400/40 bg-red-500/10 text-red-500 hover:bg-red-500/20",
+  },
+  {
+    result: "unsure",
+    label: "Unsure",
+    key: "2",
+    cls: "border-amber-400/40 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20",
+  },
+  {
+    result: "know",
+    label: "Know",
+    key: "3",
+    cls: "border-emerald-400/40 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20",
+  },
+]
 
 function previewBox(box: number, result: ReviewResult): number {
   if (result === "know") return Math.min(box + 1, 5)
@@ -32,12 +52,10 @@ export function FlashcardCard({ card, index, total, onReview, onPrev, onNext }: 
   const faceRef = useRef(face)
   faceRef.current = face
 
-  // Reset to front when card changes
   useEffect(() => {
     setFace("front")
   }, [card.id])
 
-  // Keyboard shortcuts
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       const target = e.target as HTMLElement | null
@@ -65,20 +83,38 @@ export function FlashcardCard({ card, index, total, onReview, onPrev, onNext }: 
 
   return (
     <div className="flex-1 flex flex-col min-h-0 gap-3">
-      {/* Progress */}
-      <div className="flex items-center justify-between text-xs text-muted-foreground shrink-0">
-        <span>Card {index + 1} of {total}</span>
-        <span className="capitalize">
-          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${TYPE_COLORS[card.card_type]}`}>
-            {card.card_type}
+      {/* Header row */}
+      <div className="flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">
+            {index + 1} / {total}
           </span>
+          {/* Progress dots */}
+          <div className="flex gap-0.5">
+            {Array.from({ length: Math.min(total, 10) }).map((_, i) => (
+              <span
+                key={i}
+                className={`block w-1.5 h-1.5 rounded-full transition-colors ${
+                  i === index ? "bg-chart-1" : i < index ? "bg-chart-1/30" : "bg-border/40"
+                }`}
+              />
+            ))}
+            {total > 10 && <span className="text-[10px] text-muted-foreground ml-1">…</span>}
+          </div>
+        </div>
+        <span
+          className={`capitalize text-[11px] font-medium px-2 py-0.5 rounded-full border ${
+            TYPE_COLORS[card.card_type] ?? "border-border/40 bg-card/20 text-muted-foreground"
+          }`}
+        >
+          {card.card_type}
         </span>
       </div>
 
       {/* 3D flip card */}
       <div
-        className="flex-1 min-h-0 cursor-pointer"
-        style={{ perspective: "1000px" }}
+        className="flex-1 min-h-0 cursor-pointer select-none"
+        style={{ perspective: "1200px" }}
         onClick={() => setFace((f) => (f === "front" ? "back" : "front"))}
       >
         <motion.div
@@ -87,52 +123,50 @@ export function FlashcardCard({ card, index, total, onReview, onPrev, onNext }: 
           animate={{ rotateY: face === "front" ? 0 : 180 }}
           transition={{ duration: 0.45, ease: "easeInOut" }}
         >
-          {/* Front face */}
+          {/* Front */}
           <div
-            className="absolute inset-0 rounded-xl border border-border bg-card/70 backdrop-blur-sm p-6 flex flex-col items-center justify-center gap-3 text-center"
+            className="absolute inset-0 rounded-2xl border border-border/40 bg-card/30 backdrop-blur-md p-6 flex flex-col items-center justify-center gap-3 text-center overflow-hidden"
             style={{ backfaceVisibility: "hidden" }}
           >
-            <p className="text-base font-medium text-foreground leading-relaxed">{card.front}</p>
-            <p className="text-xs text-muted-foreground mt-2">
-              Space or tap to reveal
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-violet-500/5 pointer-events-none rounded-2xl" />
+            <p className="text-base font-medium text-foreground leading-relaxed relative z-10">
+              {card.front}
             </p>
+            <p className="text-xs text-muted-foreground/50 relative z-10">tap to reveal</p>
           </div>
 
-          {/* Back face */}
+          {/* Back */}
           <div
-            className="absolute inset-0 rounded-xl border border-primary/30 bg-card/70 backdrop-blur-sm p-6 flex flex-col gap-4"
+            className="absolute inset-0 rounded-2xl border border-chart-1/30 bg-card/30 backdrop-blur-md p-5 flex flex-col gap-3 overflow-hidden"
             style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
           >
-            <p className="flex-1 text-sm text-foreground leading-relaxed overflow-y-auto">{card.back}</p>
-            <div className="shrink-0 space-y-2">
-              <p className="text-[11px] text-muted-foreground text-center">
-                Box {card.box} → Box {previewBox(card.box, "know")} if Know
+            <div className="absolute inset-0 bg-gradient-to-br from-chart-1/8 via-transparent to-chart-2/8 pointer-events-none rounded-2xl" />
+
+            {/* Answer text */}
+            <div className="flex-1 min-h-0 overflow-y-auto relative z-10">
+              <p className="text-sm text-foreground leading-relaxed">{card.back}</p>
+            </div>
+
+            {/* Review controls */}
+            <div className="shrink-0 relative z-10 space-y-2">
+              <p className="text-[11px] text-muted-foreground/60 text-center">
+                Box {card.box} → {previewBox(card.box, "know")} if Know
               </p>
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1 border-red-400 text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
-                  onClick={(e) => { e.stopPropagation(); onReview("forgot") }}
-                >
-                  Forgot <span className="ml-1 text-[10px] opacity-50">1</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1 border-amber-400 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950"
-                  onClick={(e) => { e.stopPropagation(); onReview("unsure") }}
-                >
-                  Unsure <span className="ml-1 text-[10px] opacity-50">2</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1 border-emerald-400 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950"
-                  onClick={(e) => { e.stopPropagation(); onReview("know") }}
-                >
-                  Know <span className="ml-1 text-[10px] opacity-50">3</span>
-                </Button>
+                {REVIEW_BUTTONS.map(({ result, label, key, cls }) => (
+                  <button
+                    key={result}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onReview(result)
+                    }}
+                    className={`flex-1 py-2 rounded-xl border text-sm font-medium transition-colors cursor-pointer ${cls}`}
+                  >
+                    {label}{" "}
+                    <span className="opacity-40 text-xs">{key}</span>
+                  </button>
+                ))}
               </div>
             </div>
           </div>
@@ -140,8 +174,8 @@ export function FlashcardCard({ card, index, total, onReview, onPrev, onNext }: 
       </div>
 
       {/* Nav hint */}
-      <p className="shrink-0 text-center text-[11px] text-muted-foreground/60">
-        ← → browse · Space to flip · 1/2/3 to rate
+      <p className="shrink-0 text-center text-[11px] text-muted-foreground/50">
+        ← → browse · Space flip · 1 / 2 / 3 rate
       </p>
     </div>
   )
