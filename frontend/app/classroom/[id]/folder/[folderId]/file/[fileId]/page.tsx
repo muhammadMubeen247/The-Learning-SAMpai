@@ -599,7 +599,7 @@ export default function FilePage() {
             {/* ── MINDMAP ── */}
             <div className={`h-full rounded-2xl border border-border/40 bg-card/30 backdrop-blur-md overflow-hidden ${activeTab === "mindmap" ? "flex flex-col" : "hidden"}`}>
               {fullReady ? (
-                <MindmapShell fileId={Number(fileId)} classroomId={classroomId} fileName={file.filename} />
+                <MindmapShell fileId={Number(fileId)} classroomId={classroomId} fileName={file.filename} isActive={activeTab === "mindmap"} />
               ) : (
                 <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
                   Mindmap will be available once full document analysis finishes.

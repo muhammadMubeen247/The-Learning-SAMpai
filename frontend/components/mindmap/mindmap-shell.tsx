@@ -4,19 +4,26 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, RefreshCw, AlertTriangle, Map } from "lucide-react";
 import { useMindmap } from "@/hooks/use-mindmap";
 import { useMindmapChat } from "@/hooks/use-mindmap-chat";
-import MindmapCanvas from "./mindmap-canvas";
+import MindmapCanvas, { type MindmapCanvasHandle } from "./mindmap-canvas";
 import MindmapChatPanel from "./mindmap-chat-panel";
 
 interface MindmapShellProps {
   fileId: number;
   classroomId: number;
   fileName: string;
+  /** True when the Mindmap tab is the active tab — triggers re-fit after display:none. */
+  isActive?: boolean;
 }
 
 const MIN_CANVAS_PCT = 25;
 const MAX_CANVAS_PCT = 75;
 
-export default function MindmapShell({ fileId, classroomId, fileName }: MindmapShellProps) {
+export default function MindmapShell({
+  fileId,
+  classroomId,
+  fileName,
+  isActive,
+}: MindmapShellProps) {
   const { mindmap, status, isLoading, error, generate } = useMindmap({
     fileId,
     autoGenerate: false,
@@ -34,8 +41,32 @@ export default function MindmapShell({ fileId, classroomId, fileName }: MindmapS
   const [splitPct, setSplitPct] = useState(50);
   const [isDragging, setIsDragging] = useState(false);
 
-  const containerRef = useRef<HTMLDivElement>(null);
+  // Animated re-fit counter for non-drag events (tab visibility, chat toggle)
+  const [fitCounter, setFitCounter] = useState(0);
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<MindmapCanvasHandle>(null);
+  const fitRafRef = useRef<number>(0);         // RAF id for real-time drag fit
+  const isFirstChatEffect = useRef(true);
+
+  // ── Re-fit when the tab becomes visible (fixes display:none init issue) ──────
+  useEffect(() => {
+    if (!isActive) return;
+    const timer = setTimeout(() => setFitCounter((c) => c + 1), 200);
+    return () => clearTimeout(timer);
+  }, [isActive]);
+
+  // ── Animated re-fit when chat panel opens or closes (skip mount) ─────────────
+  useEffect(() => {
+    if (isFirstChatEffect.current) {
+      isFirstChatEffect.current = false;
+      return;
+    }
+    const timer = setTimeout(() => setFitCounter((c) => c + 1), 100);
+    return () => clearTimeout(timer);
+  }, [chatOpen]);
+
+  // ── Drag-to-resize ───────────────────────────────────────────────────────────
   const startDrag = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -48,15 +79,26 @@ export default function MindmapShell({ fileId, classroomId, fileName }: MindmapS
 
     const onMove = (e: MouseEvent) => {
       if (!containerRef.current) return;
+
       const rect = containerRef.current.getBoundingClientRect();
       const pct = ((e.clientX - rect.left) / rect.width) * 100;
       setSplitPct(Math.max(MIN_CANVAS_PCT, Math.min(MAX_CANVAS_PCT, pct)));
+
+      // Call fitView on the next animation frame — after React has committed the
+      // new width to the DOM — so the canvas is always visible during drag.
+      cancelAnimationFrame(fitRafRef.current);
+      fitRafRef.current = requestAnimationFrame(() => {
+        canvasRef.current?.fitView();
+      });
     };
 
     const onUp = () => {
       setIsDragging(false);
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
+      cancelAnimationFrame(fitRafRef.current);
+      // One final animated re-fit to cleanly settle after drag ends
+      setFitCounter((c) => c + 1);
     };
 
     window.addEventListener("mousemove", onMove);
@@ -64,6 +106,7 @@ export default function MindmapShell({ fileId, classroomId, fileName }: MindmapS
     return () => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
+      cancelAnimationFrame(fitRafRef.current);
     };
   }, [isDragging]);
 
@@ -152,9 +195,11 @@ export default function MindmapShell({ fileId, classroomId, fileName }: MindmapS
         style={{ width: chatOpen ? `${splitPct}%` : "100%" }}
       >
         <MindmapCanvas
+          ref={canvasRef}
           root={root}
           activeNodeId={chat.activeNodeId}
           onNodeClick={handleNodeClick}
+          fitTrigger={fitCounter}
         />
       </div>
 
